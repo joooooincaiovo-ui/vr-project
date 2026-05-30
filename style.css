@@ -37,3 +37,18 @@ canvas {
   font-size: 14px;
   opacity: 0.85;
 }
+
+#fog-overlay {
+  position: fixed;
+  inset: 0;
+
+  background: white;
+
+  opacity: 0;
+
+  backdrop-filter: blur(0px);
+
+  pointer-events: none;
+
+  z-index: 5;
+}
