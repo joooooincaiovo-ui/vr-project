@@ -1,10 +1,7 @@
 import * as THREE from "https://unpkg.com/three@0.158.0/build/three.module.js";
 import { OrbitControls } from "https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js";
-import { DeviceOrientationControls } from "https://unpkg.com/three@0.158.0/examples/jsm/controls/DeviceOrientationControls.js";
 
 let scene, camera, renderer, controls;
-let deviceControls = null;
-let useDeviceOrientation = false;
 
 let gamepadIndex = null;
 
@@ -15,6 +12,9 @@ const zoomSpeed = 0.35;
 const deadZone = 0.15;
 
 let fogOverlay = null;
+
+let useDeviceOrientation = false;
+let latestDeviceOrientation = null;
 
 init();
 animate();
@@ -28,9 +28,13 @@ function init() {
     0.1,
     1000
   );
+
   camera.position.set(0, 0, 0.1);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
 
@@ -41,7 +45,9 @@ function init() {
   controls.enablePan = false;
   controls.rotateSpeed = -0.35;
 
-   const loader = new THREE.CubeTextureLoader();
+  const loader = new THREE.CubeTextureLoader();
+
+  // 注意：这里是你现在的新图片目录
   loader.setPath("./assets/images/");
 
   const texture = loader.load([
@@ -55,11 +61,12 @@ function init() {
 
   scene.background = texture;
 
-  setupGamepadTest();
-setupDeviceOrientation();
-
-window.addEventListener("resize", onWindowResize);
   fogOverlay = document.querySelector("#fog-overlay");
+
+  setupGamepadTest();
+  setupDeviceOrientation();
+
+  window.addEventListener("resize", onWindowResize);
 }
 
 function setupGamepadTest() {
@@ -83,13 +90,100 @@ function setupGamepadTest() {
   });
 }
 
+function checkGamepadInput() {
+  if (gamepadIndex === null) return;
+
+  const gamepads = navigator.getGamepads();
+  const gamepad = gamepads[gamepadIndex];
+
+  if (!gamepad) return;
+
+  const axes = gamepad.axes.map((axis) => axis.toFixed(2));
+  const pressedButtons = [];
+
+  gamepad.buttons.forEach((button, index) => {
+    if (button.pressed) {
+      pressedButtons.push(index);
+    }
+  });
+
+  // 左摇杆上下方向
+  const leftStickY = gamepad.axes[1];
+
+  if (Math.abs(leftStickY) > deadZone) {
+    targetFov += leftStickY * zoomSpeed;
+
+    targetFov = THREE.MathUtils.clamp(
+      targetFov,
+      minFov,
+      maxFov
+    );
+  }
+
+  camera.fov = THREE.MathUtils.lerp(
+    camera.fov,
+    targetFov,
+    0.08
+  );
+
+  camera.updateProjectionMatrix();
+
+  updateFogByFov();
+
+  const infoText = document.querySelector("#info p");
+
+  if (infoText) {
+    infoText.textContent =
+      `手柄已连接 | 左摇杆：${axes[0]}, ${axes[1]} | 当前FOV：${camera.fov.toFixed(1)} | 按下按钮：${pressedButtons.join(", ") || "无"}`;
+  }
+}
+
+function updateFogByFov() {
+  if (!fogOverlay) return;
+
+  let fogOpacity = 0;
+  let blurAmount = 0;
+
+  if (camera.fov < 65) {
+    fogOpacity = THREE.MathUtils.mapLinear(
+      camera.fov,
+      65,
+      35,
+      0,
+      0.45
+    );
+
+    blurAmount = THREE.MathUtils.mapLinear(
+      camera.fov,
+      65,
+      35,
+      0,
+      12
+    );
+  }
+
+  fogOpacity = THREE.MathUtils.clamp(
+    fogOpacity,
+    0,
+    0.45
+  );
+
+  blurAmount = THREE.MathUtils.clamp(
+    blurAmount,
+    0,
+    12
+  );
+
+  fogOverlay.style.opacity = fogOpacity.toFixed(3);
+  fogOverlay.style.backdropFilter = `blur(${blurAmount}px)`;
+}
+
 function setupDeviceOrientation() {
   const orientationButton = document.querySelector("#orientation-btn");
 
   if (!orientationButton) return;
 
   orientationButton.addEventListener("click", async () => {
-    // iPhone / iPad 需要用户点击后手动申请权限
     if (
       typeof DeviceOrientationEvent !== "undefined" &&
       typeof DeviceOrientationEvent.requestPermission === "function"
@@ -108,13 +202,15 @@ function setupDeviceOrientation() {
       }
     }
 
-    // 创建手机方向控制器
-    deviceControls = new DeviceOrientationControls(camera);
-    deviceControls.connect();
+    window.addEventListener(
+      "deviceorientation",
+      function (event) {
+        latestDeviceOrientation = event;
+      },
+      true
+    );
 
     useDeviceOrientation = true;
-
-    // 手机陀螺仪开启后，关闭鼠标拖动控制，避免两个控制器打架
     controls.enabled = false;
 
     orientationButton.classList.add("hidden");
@@ -123,47 +219,69 @@ function setupDeviceOrientation() {
   });
 }
 
-function checkGamepadInput() {
-  if (gamepadIndex === null) return;
+function updateCameraByDeviceOrientation() {
+  if (!latestDeviceOrientation) return;
 
-  const gamepads = navigator.getGamepads();
-  const gamepad = gamepads[gamepadIndex];
+  const alpha = THREE.MathUtils.degToRad(
+    latestDeviceOrientation.alpha || 0
+  );
 
-  if (!gamepad) return;
+  const beta = THREE.MathUtils.degToRad(
+    latestDeviceOrientation.beta || 0
+  );
 
-  const axes = gamepad.axes.map((axis) => axis.toFixed(2));
-  const pressedButtons = [];
+  const gamma = THREE.MathUtils.degToRad(
+    latestDeviceOrientation.gamma || 0
+  );
 
-  gamepad.buttons.forEach((button, index) => {
-    if (button.pressed) {
-      pressedButtons.push(index);
-    }
-  });
+  const orient = THREE.MathUtils.degToRad(
+    window.orientation || 0
+  );
 
-  // 左摇杆通常是 axes[0] 和 axes[1]
-  // axes[0] = 左右
-  // axes[1] = 上下
-  const leftStickY = gamepad.axes[1];
+  setObjectQuaternion(
+    camera.quaternion,
+    alpha,
+    beta,
+    gamma,
+    orient
+  );
+}
 
-  if (Math.abs(leftStickY) > deadZone) {
-    targetFov += leftStickY * zoomSpeed;
-    targetFov = THREE.MathUtils.clamp(targetFov, minFov, maxFov);
-  }
+// 这一段是手机陀螺仪方向换算
+const zee = new THREE.Vector3(0, 0, 1);
+const euler = new THREE.Euler();
+const q0 = new THREE.Quaternion();
+const q1 = new THREE.Quaternion(
+  -Math.sqrt(0.5),
+  0,
+  0,
+  Math.sqrt(0.5)
+);
 
-  camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 0.08);
-  camera.updateProjectionMatrix();
+function setObjectQuaternion(
+  quaternion,
+  alpha,
+  beta,
+  gamma,
+  orient
+) {
+  euler.set(
+    beta,
+    alpha,
+    -gamma,
+    "YXZ"
+  );
 
-  updateFogByFov();
-
-  const infoText = document.querySelector("#info p");
-  if (infoText) {
-    infoText.textContent =
-      `手柄已连接 | 左摇杆：${axes[0]}, ${axes[1]} | 当前视角FOV：${camera.fov.toFixed(1)} | 按下按钮：${pressedButtons.join(", ") || "无"}`;
-  }
+  quaternion.setFromEuler(euler);
+  quaternion.multiply(q1);
+  quaternion.multiply(
+    q0.setFromAxisAngle(zee, -orient)
+  );
 }
 
 function updateInfo(text) {
   const infoText = document.querySelector("#info p");
+
   if (infoText) {
     infoText.textContent = text;
   }
@@ -172,57 +290,23 @@ function updateInfo(text) {
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+  );
 }
 
 function animate() {
   renderer.setAnimationLoop(() => {
     checkGamepadInput();
 
-    if (useDeviceOrientation && deviceControls) {
-      deviceControls.update();
+    if (useDeviceOrientation) {
+      updateCameraByDeviceOrientation();
     } else {
       controls.update();
     }
 
     renderer.render(scene, camera);
   });
-}
-
-function updateFogByFov() {
-
-  if (!fogOverlay) return;
-
-  let fogOpacity = 0;
-  let blurAmount = 0;
-
-  if (camera.fov < 65) {
-
-    fogOpacity = THREE.MathUtils.mapLinear(
-      camera.fov,
-      65,
-      35,
-      0,
-      0.35
-    );
-
-    blurAmount = THREE.MathUtils.mapLinear(
-      camera.fov,
-      65,
-      35,
-      0,
-    );
-
-  }
-
-  fogOpacity = THREE.MathUtils.clamp(
-    fogOpacity,
-    0,
-    0.35
-  );
-
-  fogOverlay.style.opacity = fogOpacity;
-
-  fogOverlay.style.backdropFilter =
-    `blur(${blurAmount}px)`;
 }
