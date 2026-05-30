@@ -16,14 +16,73 @@ let fogOverlay = null;
 let useDeviceOrientation = false;
 let latestDeviceOrientation = null;
 
-init();
-animate();
+let playMode = null;
+// playMode = "pc" 或 "mobile"
 
-function init() {
+let leftCamera, rightCamera;
+const eyeOffset = 0.03;
+
+initLoading();
+
+function initLoading() {
+  const loadingPanel = document.querySelector("#loading-panel");
+  const modePanel = document.querySelector("#mode-panel");
+  const loadingBar = document.querySelector("#loading-bar");
+  const loadingText = document.querySelector("#loading-text");
+
+  let progress = 0;
+  const totalTime = 5000;
+  const intervalTime = 50;
+  const step = 100 / (totalTime / intervalTime);
+
+  const timer = setInterval(() => {
+    progress += step;
+
+    if (progress >= 100) {
+      progress = 100;
+      clearInterval(timer);
+
+      setTimeout(() => {
+        loadingPanel.classList.add("hidden");
+        modePanel.classList.remove("hidden");
+      }, 300);
+    }
+
+    loadingBar.style.width = `${progress}%`;
+    loadingText.textContent = `Loading ${Math.round(progress)}%`;
+  }, intervalTime);
+
+  document.querySelector("#pc-mode-btn").addEventListener("click", () => {
+    startExperience("pc");
+  });
+
+  document.querySelector("#mobile-mode-btn").addEventListener("click", () => {
+    startExperience("mobile");
+  });
+}
+
+function startExperience(mode) {
+  playMode = mode;
+
+  document.querySelector("#start-screen").classList.add("hidden");
+  document.querySelector("#info").classList.remove("hidden");
+
+  if (mode === "mobile") {
+    document.querySelector("#orientation-btn").classList.remove("hidden");
+    updateInfo("移动端模式：请横屏并点击开启手机陀螺仪");
+  } else {
+    updateInfo("PC模式：鼠标拖动环顾场景 / 手柄左摇杆控制前进");
+  }
+
+  initScene();
+  animate();
+}
+
+function initScene() {
   scene = new THREE.Scene();
 
   camera = new THREE.PerspectiveCamera(
-    75,
+    targetFov,
     window.innerWidth / window.innerHeight,
     0.1,
     1000
@@ -37,6 +96,7 @@ function init() {
 
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.autoClear = false;
 
   document.body.appendChild(renderer.domElement);
 
@@ -47,7 +107,7 @@ function init() {
 
   const loader = new THREE.CubeTextureLoader();
 
-  // 注意：这里是你现在的新图片目录
+  // 这里是你现在的图片目录
   loader.setPath("./assets/images/");
 
   const texture = loader.load([
@@ -63,28 +123,36 @@ function init() {
 
   fogOverlay = document.querySelector("#fog-overlay");
 
+  setupStereoCameras();
   setupGamepadTest();
   setupDeviceOrientation();
 
   window.addEventListener("resize", onWindowResize);
 }
 
-function setupGamepadTest() {
-  updateInfo("等待手柄连接：请先按一下手柄任意按键");
+function setupStereoCameras() {
+  leftCamera = camera.clone();
+  rightCamera = camera.clone();
 
+  leftCamera.aspect = window.innerWidth / 2 / window.innerHeight;
+  rightCamera.aspect = window.innerWidth / 2 / window.innerHeight;
+
+  leftCamera.updateProjectionMatrix();
+  rightCamera.updateProjectionMatrix();
+}
+
+function setupGamepadTest() {
   window.addEventListener("gamepadconnected", function (event) {
     gamepadIndex = event.gamepad.index;
 
     console.log("手柄已连接：", event.gamepad);
 
     updateInfo(
-      `手柄已连接：${event.gamepad.id} / 按键数：${event.gamepad.buttons.length} / 摇杆轴数：${event.gamepad.axes.length}`
+      `手柄已连接：${event.gamepad.id} / 左摇杆控制前进后退`
     );
   });
 
-  window.addEventListener("gamepaddisconnected", function (event) {
-    console.log("手柄已断开：", event.gamepad);
-
+  window.addEventListener("gamepaddisconnected", function () {
     gamepadIndex = null;
     updateInfo("手柄已断开");
   });
@@ -211,11 +279,14 @@ function setupDeviceOrientation() {
     );
 
     useDeviceOrientation = true;
-    controls.enabled = false;
+
+    if (controls) {
+      controls.enabled = false;
+    }
 
     orientationButton.classList.add("hidden");
 
-    updateInfo("手机陀螺仪已开启：转动手机即可环顾场景");
+    updateInfo("手机陀螺仪已开启：请横屏放入 VR 盒子");
   });
 }
 
@@ -247,7 +318,10 @@ function updateCameraByDeviceOrientation() {
   );
 }
 
-// 这一段是手机陀螺仪方向换算
+// ===============================
+// 手机陀螺仪方向换算
+// ===============================
+
 const zee = new THREE.Vector3(0, 0, 1);
 const euler = new THREE.Euler();
 const q0 = new THREE.Quaternion();
@@ -279,6 +353,91 @@ function setObjectQuaternion(
   );
 }
 
+function updateStereoCameras() {
+  leftCamera.position.copy(camera.position);
+  rightCamera.position.copy(camera.position);
+
+  leftCamera.quaternion.copy(camera.quaternion);
+  rightCamera.quaternion.copy(camera.quaternion);
+
+  leftCamera.fov = camera.fov;
+  rightCamera.fov = camera.fov;
+
+  leftCamera.aspect = window.innerWidth / 2 / window.innerHeight;
+  rightCamera.aspect = window.innerWidth / 2 / window.innerHeight;
+
+  // 轻微左右眼偏移，模拟双眼间距
+  const eyeDirection = new THREE.Vector3(1, 0, 0);
+  eyeDirection.applyQuaternion(camera.quaternion);
+
+  leftCamera.position.addScaledVector(eyeDirection, -eyeOffset);
+  rightCamera.position.addScaledVector(eyeDirection, eyeOffset);
+
+  leftCamera.updateProjectionMatrix();
+  rightCamera.updateProjectionMatrix();
+}
+
+function renderPCMode() {
+  renderer.setScissorTest(false);
+  renderer.setViewport(
+    0,
+    0,
+    window.innerWidth,
+    window.innerHeight
+  );
+
+  renderer.clear();
+  renderer.render(scene, camera);
+}
+
+function renderMobileMode() {
+  updateStereoCameras();
+
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const halfWidth = width / 2;
+
+  renderer.clear();
+
+  renderer.setScissorTest(true);
+
+  // 左眼画面
+  renderer.setViewport(
+    0,
+    0,
+    halfWidth,
+    height
+  );
+
+  renderer.setScissor(
+    0,
+    0,
+    halfWidth,
+    height
+  );
+
+  renderer.render(scene, leftCamera);
+
+  // 右眼画面
+  renderer.setViewport(
+    halfWidth,
+    0,
+    halfWidth,
+    height
+  );
+
+  renderer.setScissor(
+    halfWidth,
+    0,
+    halfWidth,
+    height
+  );
+
+  renderer.render(scene, rightCamera);
+
+  renderer.setScissorTest(false);
+}
+
 function updateInfo(text) {
   const infoText = document.querySelector("#info p");
 
@@ -288,6 +447,8 @@ function updateInfo(text) {
 }
 
 function onWindowResize() {
+  if (!camera || !renderer) return;
+
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 
@@ -295,6 +456,14 @@ function onWindowResize() {
     window.innerWidth,
     window.innerHeight
   );
+
+  if (leftCamera && rightCamera) {
+    leftCamera.aspect = window.innerWidth / 2 / window.innerHeight;
+    rightCamera.aspect = window.innerWidth / 2 / window.innerHeight;
+
+    leftCamera.updateProjectionMatrix();
+    rightCamera.updateProjectionMatrix();
+  }
 }
 
 function animate() {
@@ -307,6 +476,10 @@ function animate() {
       controls.update();
     }
 
-    renderer.render(scene, camera);
+    if (playMode === "mobile") {
+      renderMobileMode();
+    } else {
+      renderPCMode();
+    }
   });
 }

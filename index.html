@@ -19,14 +19,38 @@
 </head>
 
 <body>
-  <div id="info">
-    <h1>VR Project</h1>
-    <p>等待手柄连接：请先按一下手柄任意按键</p>
+  <!-- 加载界面 -->
+  <div id="start-screen">
+    <div id="loading-panel">
+      <h1>VR Project</h1>
+
+      <div id="loading-bar-bg">
+        <div id="loading-bar"></div>
+      </div>
+
+      <p id="loading-text">Loading 0%</p>
+    </div>
+
+    <div id="mode-panel" class="hidden">
+      <h1>选择游玩方式</h1>
+      <p>请选择适合当前设备的显示模式</p>
+
+      <button id="mobile-mode-btn">使用移动端游玩</button>
+      <button id="pc-mode-btn">使用 PC 端游玩</button>
+    </div>
   </div>
 
+  <!-- 场景信息 -->
+  <div id="info" class="hidden">
+    <h1>VR Project</h1>
+    <p>等待进入场景</p>
+  </div>
+
+  <!-- 白雾遮罩 -->
   <div id="fog-overlay"></div>
 
-  <button id="orientation-btn">开启手机陀螺仪</button>
+  <!-- 手机陀螺仪按钮 -->
+  <button id="orientation-btn" class="hidden">开启手机陀螺仪</button>
 
   <script type="module" src="./script.js"></script>
 </body>
