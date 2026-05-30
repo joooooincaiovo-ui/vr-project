@@ -1,7 +1,11 @@
 import * as THREE from "https://unpkg.com/three@0.158.0/build/three.module.js";
 import { OrbitControls } from "https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js";
+import { DeviceOrientationControls } from "https://unpkg.com/three@0.158.0/examples/jsm/controls/DeviceOrientationControls.js";
 
 let scene, camera, renderer, controls;
+let deviceControls = null;
+let useDeviceOrientation = false;
+
 let gamepadIndex = null;
 
 let targetFov = 75;
@@ -52,8 +56,9 @@ function init() {
   scene.background = texture;
 
   setupGamepadTest();
+setupDeviceOrientation();
 
-  window.addEventListener("resize", onWindowResize);
+window.addEventListener("resize", onWindowResize);
   fogOverlay = document.querySelector("#fog-overlay");
 }
 
@@ -75,6 +80,46 @@ function setupGamepadTest() {
 
     gamepadIndex = null;
     updateInfo("手柄已断开");
+  });
+}
+
+function setupDeviceOrientation() {
+  const orientationButton = document.querySelector("#orientation-btn");
+
+  if (!orientationButton) return;
+
+  orientationButton.addEventListener("click", async () => {
+    // iPhone / iPad 需要用户点击后手动申请权限
+    if (
+      typeof DeviceOrientationEvent !== "undefined" &&
+      typeof DeviceOrientationEvent.requestPermission === "function"
+    ) {
+      try {
+        const permission = await DeviceOrientationEvent.requestPermission();
+
+        if (permission !== "granted") {
+          updateInfo("陀螺仪权限未开启");
+          return;
+        }
+      } catch (error) {
+        console.error("陀螺仪权限申请失败：", error);
+        updateInfo("陀螺仪权限申请失败");
+        return;
+      }
+    }
+
+    // 创建手机方向控制器
+    deviceControls = new DeviceOrientationControls(camera);
+    deviceControls.connect();
+
+    useDeviceOrientation = true;
+
+    // 手机陀螺仪开启后，关闭鼠标拖动控制，避免两个控制器打架
+    controls.enabled = false;
+
+    orientationButton.classList.add("hidden");
+
+    updateInfo("手机陀螺仪已开启：转动手机即可环顾场景");
   });
 }
 
@@ -133,7 +178,13 @@ function onWindowResize() {
 function animate() {
   renderer.setAnimationLoop(() => {
     checkGamepadInput();
-    controls.update();
+
+    if (useDeviceOrientation && deviceControls) {
+      deviceControls.update();
+    } else {
+      controls.update();
+    }
+
     renderer.render(scene, camera);
   });
 }

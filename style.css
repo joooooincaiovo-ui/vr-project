@@ -52,3 +52,28 @@ canvas {
 
   z-index: 5;
 }
+
+#orientation-btn {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+
+  z-index: 20;
+
+  padding: 12px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+
+  background: rgba(0, 0, 0, 0.45);
+  color: white;
+
+  font-size: 14px;
+  letter-spacing: 1px;
+
+  backdrop-filter: blur(8px);
+}
+
+#orientation-btn.hidden {
+  display: none;
+}
