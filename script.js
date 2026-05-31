@@ -22,6 +22,21 @@ let playMode = null;
 let leftCamera, rightCamera;
 const eyeOffset = 0.03;
 
+// ===============================
+// 移动端 VR 盒子显示参数
+// ===============================
+
+// 单个眼睛画面的缩放比例
+// 数值越小，左右眼画面越小，黑边越大
+const mobileEyeScale = 0.72;
+
+// 两个眼睛画面之间的距离
+// 数值越大，中间黑色间隔越宽
+const mobileEyeGap = 80;
+
+// 圆角黑框的圆角大小
+const mobileEyeRadius = 36;
+
 initLoading();
 
 function initLoading() {
@@ -67,12 +82,14 @@ function startExperience(mode) {
   document.querySelector("#start-screen").classList.add("hidden");
   document.querySelector("#info").classList.remove("hidden");
 
-  if (mode === "mobile") {
-    document.querySelector("#orientation-btn").classList.remove("hidden");
-    updateInfo("移动端模式：请横屏并点击开启手机陀螺仪");
-  } else {
-    updateInfo("PC模式：鼠标拖动环顾场景 / 手柄左摇杆控制前进");
-  }
+if (mode === "mobile") {
+  document.querySelector("#orientation-btn").classList.remove("hidden");
+  document.querySelector("#vr-frame-overlay").classList.remove("hidden");
+  updateInfo("移动端模式：请横屏并点击开启手机陀螺仪");
+} else {
+  document.querySelector("#vr-frame-overlay").classList.add("hidden");
+  updateInfo("PC模式：鼠标拖动环顾场景 / 手柄左摇杆控制前进");
+}
 
   initScene();
   animate();
@@ -363,8 +380,12 @@ function updateStereoCameras() {
   leftCamera.fov = camera.fov;
   rightCamera.fov = camera.fov;
 
-  leftCamera.aspect = window.innerWidth / 2 / window.innerHeight;
-  rightCamera.aspect = window.innerWidth / 2 / window.innerHeight;
+  // 移动端每只眼睛的画面不是占满半屏，而是缩小后的窗口比例
+  const eyeWidth = window.innerWidth * mobileEyeScale / 2;
+  const eyeHeight = window.innerHeight * mobileEyeScale;
+
+  leftCamera.aspect = eyeWidth / eyeHeight;
+  rightCamera.aspect = eyeWidth / eyeHeight;
 
   // 轻微左右眼偏移，模拟双眼间距
   const eyeDirection = new THREE.Vector3(1, 0, 0);
@@ -395,47 +416,101 @@ function renderMobileMode() {
 
   const width = window.innerWidth;
   const height = window.innerHeight;
-  const halfWidth = width / 2;
 
+  // 单个眼睛窗口尺寸
+  const eyeWidth = width * mobileEyeScale / 2;
+  const eyeHeight = height * mobileEyeScale;
+
+  // 左右眼整体占用宽度
+  const totalEyeWidth = eyeWidth * 2 + mobileEyeGap;
+
+  // 让左右眼画面整体居中
+  const startX = (width - totalEyeWidth) / 2;
+  const eyeY = (height - eyeHeight) / 2;
+
+  const leftX = startX;
+  const rightX = startX + eyeWidth + mobileEyeGap;
+
+  // 黑色背景
+  renderer.setClearColor(0x000000, 1);
   renderer.clear();
 
   renderer.setScissorTest(true);
 
+  // ===============================
   // 左眼画面
+  // ===============================
   renderer.setViewport(
-    0,
-    0,
-    halfWidth,
-    height
+    leftX,
+    eyeY,
+    eyeWidth,
+    eyeHeight
   );
 
   renderer.setScissor(
-    0,
-    0,
-    halfWidth,
-    height
+    leftX,
+    eyeY,
+    eyeWidth,
+    eyeHeight
   );
 
   renderer.render(scene, leftCamera);
 
+  // ===============================
   // 右眼画面
+  // ===============================
   renderer.setViewport(
-    halfWidth,
-    0,
-    halfWidth,
-    height
+    rightX,
+    eyeY,
+    eyeWidth,
+    eyeHeight
   );
 
   renderer.setScissor(
-    halfWidth,
-    0,
-    halfWidth,
-    height
+    rightX,
+    eyeY,
+    eyeWidth,
+    eyeHeight
   );
 
   renderer.render(scene, rightCamera);
 
   renderer.setScissorTest(false);
+  updateMobileFrameOverlay();
+}
+
+function updateMobileFrameOverlay() {
+  const overlay = document.querySelector("#vr-frame-overlay");
+  const leftFrame = document.querySelector(".left-eye-frame");
+  const rightFrame = document.querySelector(".right-eye-frame");
+
+  if (!overlay || !leftFrame || !rightFrame) return;
+
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  const eyeWidth = width * mobileEyeScale / 2;
+  const eyeHeight = height * mobileEyeScale;
+
+  const totalEyeWidth = eyeWidth * 2 + mobileEyeGap;
+
+  const startX = (width - totalEyeWidth) / 2;
+  const eyeY = (height - eyeHeight) / 2;
+
+  const leftX = startX;
+  const rightX = startX + eyeWidth + mobileEyeGap;
+
+  leftFrame.style.left = `${leftX}px`;
+  leftFrame.style.top = `${eyeY}px`;
+  leftFrame.style.width = `${eyeWidth}px`;
+  leftFrame.style.height = `${eyeHeight}px`;
+  leftFrame.style.borderRadius = `${mobileEyeRadius}px`;
+
+  rightFrame.style.left = `${rightX}px`;
+  rightFrame.style.top = `${eyeY}px`;
+  rightFrame.style.width = `${eyeWidth}px`;
+  rightFrame.style.height = `${eyeHeight}px`;
+  rightFrame.style.borderRadius = `${mobileEyeRadius}px`;
 }
 
 function updateInfo(text) {

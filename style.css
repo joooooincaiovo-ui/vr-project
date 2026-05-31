@@ -175,3 +175,22 @@ canvas {
 
   backdrop-filter: blur(8px);
 }
+
+#vr-frame-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.eye-frame {
+  position: absolute;
+
+  border: 3px solid #000;
+  border-radius: 36px;
+
+  
+  box-shadow:
+    0 0 0 15px #000,
+    inset 0 0 0 2px rgba(0, 0, 0, 0.9);
+}
