@@ -28,14 +28,14 @@ const eyeOffset = 0.03;
 
 // 单个眼睛画面的缩放比例
 // 数值越小，左右眼画面越小，黑边越大
-const mobileEyeScale = 0.72;
+const mobileEyeScale = 0.81;
 
 // 两个眼睛画面之间的距离
 // 数值越大，中间黑色间隔越宽
-const mobileEyeGap = 80;
+const mobileEyeGap = 78;
 
 // 圆角黑框的圆角大小
-const mobileEyeRadius = 36;
+const mobileEyeRadius = 39;
 
 initLoading();
 
