@@ -28,14 +28,14 @@ const eyeOffset = 0.03;
 
 // 单个眼睛画面的缩放比例
 // 数值越小，左右眼画面越小，黑边越大
-const mobileEyeScale = 0.81;
+const mobileEyeScale = 0.72;
 
 // 两个眼睛画面之间的距离
 // 数值越大，中间黑色间隔越宽
-const mobileEyeGap = 78;
+const mobileEyeGap = 80;
 
 // 圆角黑框的圆角大小
-const mobileEyeRadius = 39;
+const mobileEyeRadius = 999;
 
 initLoading();
 
@@ -504,13 +504,13 @@ function updateMobileFrameOverlay() {
   leftFrame.style.top = `${eyeY}px`;
   leftFrame.style.width = `${eyeWidth}px`;
   leftFrame.style.height = `${eyeHeight}px`;
-  leftFrame.style.borderRadius = `${mobileEyeRadius}px`;
+  leftFrame.style.borderRadius = "0px";
 
   rightFrame.style.left = `${rightX}px`;
   rightFrame.style.top = `${eyeY}px`;
   rightFrame.style.width = `${eyeWidth}px`;
   rightFrame.style.height = `${eyeHeight}px`;
-  rightFrame.style.borderRadius = `${mobileEyeRadius}px`;
+  rightFrame.style.borderRadius = "0px";
 }
 
 function updateInfo(text) {
