@@ -187,6 +187,9 @@ let selectedIndex = 0;
 const activeAudios = {};
 const confirmedSoundIds = new Set();
 
+let finishHintSprite = null;
+let finishHintTimer = null;
+
 const playedSoundRecords = {
   floor1: [],
   floor2: [],
@@ -200,6 +203,8 @@ let previousAButtonPressed = false;
 let previousStickDirection = 0;
 let lastStickMoveTime = 0;
 const stickMoveCooldown = 260;
+
+let previousDownStickPressed = false;
 
 // ===============================
 // 初始化
@@ -401,6 +406,13 @@ function clearInteractiveObjects() {
 
   interactiveObjects.length = 0;
   selectableObjects.length = 0;
+
+  finishHintSprite = null;
+
+if (finishHintTimer) {
+  clearTimeout(finishHintTimer);
+  finishHintTimer = null;
+}
 }
 
 // ===============================
@@ -412,6 +424,9 @@ function clearInteractiveObjects() {
 function createFloatingObject(item, index) {
   const group = new THREE.Group();
   group.position.copy(item.position);
+
+  // 新增：记录物体初始位置，后面漂浮动画会用到
+  group.userData.basePosition = item.position.clone();
 
   const geometry = new THREE.SphereGeometry(0.22, 32, 32);
   const material = new THREE.MeshBasicMaterial({
@@ -461,7 +476,12 @@ function createFloatingObject(item, index) {
 
 function createFinishButton() {
   const group = new THREE.Group();
+
+  // 初始位置随便给一个，后面每一帧都会自动跟随摄像机
   group.position.copy(createPositionByAngle(0, -12, 4.5));
+
+  // 新增：标记这是一个跟随摄像机的按钮
+  group.userData.followCamera = true;
 
   const geometry = new THREE.TorusGeometry(0.32, 0.035, 16, 48);
   const material = new THREE.MeshBasicMaterial({
@@ -509,20 +529,20 @@ function createFinishButton() {
 function createDashedSelectionRing(radius = 0.4) {
   const group = new THREE.Group();
 
-  const segmentCount = 24;
-  const visibleSegmentCount = 12;
+  const segmentCount = 28;
+  const segmentAngle = Math.PI * 2 / segmentCount;
 
-  for (let i = 0; i < visibleSegmentCount; i++) {
-    const angle = (i / visibleSegmentCount) * Math.PI * 2;
-    const segmentAngle = Math.PI * 2 / segmentCount;
+  for (let i = 0; i < segmentCount; i++) {
+    const startAngle = i * segmentAngle;
+    const endAngle = startAngle + segmentAngle * 0.48;
 
     const curve = new THREE.EllipseCurve(
       0,
       0,
       radius,
       radius,
-      angle,
-      angle + segmentAngle,
+      startAngle,
+      endAngle,
       false,
       0
     );
@@ -537,13 +557,21 @@ function createDashedSelectionRing(radius = 0.4) {
     });
 
     const line = new THREE.Line(geometry, material);
+
+    // 新增：记录虚线段编号，后面做流动动画
+    line.userData.dashIndex = i;
+
     group.add(line);
   }
 
   group.position.z = 0.03;
+
+  // 新增：标记这是蚂蚁线描边
+  group.userData.isMarchingDash = true;
+  group.userData.segmentCount = segmentCount;
+
   return group;
 }
-
 // ===============================
 // 新增：确认后的实线发光描边
 // ===============================
@@ -633,13 +661,28 @@ function roundRect(context, x, y, width, height, radius) {
 function moveSelection(direction) {
   if (selectableObjects.length === 0) return;
 
+  const soundObjectCount = selectableObjects.filter((object) => {
+    return object.userData.type === "sound-object";
+  }).length;
+
+  if (soundObjectCount === 0) return;
+
+  // 如果当前选中的是“完成”，左右拨动时先回到第一个或最后一个意象
+  const currentObject = getSelectedObject();
+
+  if (currentObject?.userData.type === "finish-button") {
+    selectedIndex = direction > 0 ? 0 : soundObjectCount - 1;
+    updateSelectionInfo();
+    return;
+  }
+
   selectedIndex += direction;
 
   if (selectedIndex < 0) {
-    selectedIndex = selectableObjects.length - 1;
+    selectedIndex = soundObjectCount - 1;
   }
 
-  if (selectedIndex >= selectableObjects.length) {
+  if (selectedIndex >= soundObjectCount) {
     selectedIndex = 0;
   }
 
@@ -676,6 +719,76 @@ function getSelectedObject() {
   return selectableObjects[selectedIndex] || null;
 }
 
+function hasConfirmedObjectInCurrentLevel() {
+  const currentObjects = levelData[currentLevelName]?.objects || [];
+
+  return currentObjects.some((item) => {
+    return confirmedSoundIds.has(item.id);
+  });
+}
+
+function showFinishHint() {
+  const finishObject = selectableObjects[selectableObjects.length - 1];
+
+  if (!finishObject) return;
+
+  const finishGroup = finishObject.userData.parentGroup;
+
+  if (!finishGroup) return;
+
+  if (!finishHintSprite) {
+    finishHintSprite = createSmallHintSprite("请选择一个或以上的意象组成乐曲");
+    finishHintSprite.position.set(1.25, 0.15, 0);
+    finishGroup.add(finishHintSprite);
+  }
+
+  finishHintSprite.visible = true;
+
+  if (finishHintTimer) {
+    clearTimeout(finishHintTimer);
+  }
+
+  finishHintTimer = setTimeout(() => {
+    if (finishHintSprite) {
+      finishHintSprite.visible = false;
+    }
+  }, 2200);
+}
+
+function createSmallHintSprite(text) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  canvas.width = 900;
+  canvas.height = 180;
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(0, 0, 0, 0.62)";
+  roundRect(context, 36, 42, 828, 96, 48);
+  context.fill();
+
+  context.font = "bold 38px Arial";
+  context.fillStyle = "white";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true
+  });
+
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(2.6, 0.52, 1);
+  sprite.visible = false;
+
+  return sprite;
+}
+
 // ===============================
 // A键确认当前对象
 // ===============================
@@ -696,6 +809,12 @@ function handleAButtonClick() {
   }
 
   if (type === "finish-button") {
+    if (!hasConfirmedObjectInCurrentLevel()) {
+      showFinishHint();
+      updateInfo(`${levelDisplayNames[currentLevelName]} | 请至少选择一个意象后再完成`);
+      return;
+    }
+
     goToNextLevel();
   }
 }
@@ -784,40 +903,76 @@ function updateObjectVisualStates() {
     const soundId = mesh.userData.soundId;
     const isConfirmed = isSoundObject && confirmedSoundIds.has(soundId);
 
-    // 漂浮动画
-    const offset = group.userData.floatOffset || 0;
-    group.position.y += Math.sin(time + offset) * 0.0008;
+    // ===============================
+    // 新增：完成按钮始终跟随视角前方
+    // ===============================
+    if (group.userData.followCamera) {
+      updateFinishButtonFollowCamera(group);
+    } else {
+      // 普通意象：基于初始位置做轻微漂浮，不会无限漂移
+      const basePosition = group.userData.basePosition;
 
-    // 所有物体轻微自转
-    group.rotation.y += 0.002;
+      if (basePosition) {
+        const offset = group.userData.floatOffset || 0;
+        const floatY = Math.sin(time * 1.3 + offset) * 0.08;
 
-    // 虚线预选描边：
-    // 只有当前选中、且不是已确认声音物体时显示
-    if (dashedRing) {
-      dashedRing.visible = isSelected && !isConfirmed;
-      dashedRing.rotation.z -= 0.035;
+        group.position.set(
+          basePosition.x,
+          basePosition.y + floatY,
+          basePosition.z
+        );
+      }
+
+      // 新增：所有意象永远面朝摄像机
+      group.quaternion.copy(camera.quaternion);
     }
 
-    // 实线确认描边：
+    // ===============================
+    // 虚线预选描边
+    // 当前选中、且不是已确认声音物体时显示
+    // ===============================
+    if (dashedRing) {
+      dashedRing.visible = isSelected && !isConfirmed;
+
+      if (dashedRing.visible) {
+        updateDashedRingMarching(dashedRing, time);
+      }
+    }
+
+    // ===============================
+    // 实线确认描边
     // 已确认的声音物体永远显示
-    // 完成按钮不保持确认状态，所以不显示实线确认描边
+    // 完成按钮不保持确认状态
+    // ===============================
     if (solidRing) {
       solidRing.visible = isConfirmed;
 
       if (isConfirmed) {
-        solidRing.rotation.z += 0.006;
+        // 轻微呼吸感，不再硬转
+        const glowScale = 1 + Math.sin(time * 3) * 0.035;
+        solidRing.scale.setScalar(glowScale);
+      } else {
+        solidRing.scale.setScalar(1);
       }
     }
 
+    // ===============================
     // 缩放规则：
-    // 只有当前摇杆停留的物体才微微放大
+    // 只有当前摇杆停留的物体才放大
+    // ===============================
     if (isSelected) {
-      mesh.scale.setScalar(1.38);
+      if (isFinishButton) {
+        mesh.scale.setScalar(1.28);
+      } else {
+        mesh.scale.setScalar(1.38);
+      }
     } else {
       mesh.scale.setScalar(1);
     }
 
+    // ===============================
     // 透明度规则
+    // ===============================
     if (isSelected) {
       mesh.material.opacity = 1;
     } else if (isConfirmed) {
@@ -825,11 +980,43 @@ function updateObjectVisualStates() {
     } else {
       mesh.material.opacity = 0.78;
     }
+  });
+}
 
-    // 完成按钮选中时稍微更明显
-    if (isFinishButton && isSelected) {
-      mesh.scale.setScalar(1.28);
-    }
+function selectFinishButton() {
+  if (selectableObjects.length === 0) return;
+
+  // 完成按钮永远是最后一个加入 selectableObjects 的对象
+  selectedIndex = selectableObjects.length - 1;
+
+  updateSelectionInfo();
+}
+
+function updateFinishButtonFollowCamera(group) {
+  if (!camera || !group) return;
+
+  const localOffset = new THREE.Vector3(0, -0.85, -3.2);
+
+  localOffset.applyQuaternion(camera.quaternion);
+
+  group.position.copy(camera.position).add(localOffset);
+
+  // 让按钮平面始终朝向玩家
+  group.quaternion.copy(camera.quaternion);
+}
+
+function updateDashedRingMarching(dashedRing, time) {
+  if (!dashedRing || !dashedRing.userData.isMarchingDash) return;
+
+  const flowIndex = Math.floor(time * 10);
+
+  dashedRing.children.forEach((segment) => {
+    const dashIndex = segment.userData.dashIndex || 0;
+
+    // 这里决定虚线的疏密和流动节奏
+    const visible = (dashIndex + flowIndex) % 3 !== 0;
+
+    segment.visible = visible;
   });
 }
 
@@ -936,6 +1123,11 @@ function handleKeyboardTest(event) {
     moveSelection(-1);
   }
 
+  // 新增：键盘向下也必选中完成按钮
+  if (event.code === "ArrowDown") {
+    selectFinishButton();
+  }
+
   if (event.code === "Space" || event.code === "Enter") {
     handleAButtonClick();
   }
@@ -997,13 +1189,27 @@ function checkGamepadInput() {
   const ltValue = gamepad.buttons[6]?.value || 0;
   const rtValue = gamepad.buttons[7]?.value || 0;
 
+  const leftStickX = gamepad.axes[0] || 0;
+  const leftStickY = gamepad.axes[1] || 0;
+
+  const now = performance.now();
+
   // ===============================
-  // 左摇杆左右切换选项
-  // Xbox手柄通常 axes[0] 是左摇杆横向
+  // 新增：左摇杆向下，必选中完成按钮
   // ===============================
 
-  const leftStickX = gamepad.axes[0] || 0;
-  const now = performance.now();
+  const downStickPressed = leftStickY > 0.65;
+
+  if (downStickPressed && !previousDownStickPressed) {
+    selectFinishButton();
+  }
+
+  previousDownStickPressed = downStickPressed;
+
+  // ===============================
+  // 左摇杆左右切换选项
+  // 即使现在选中的是完成按钮，左右拨动也可以回到物体
+  // ===============================
 
   let currentStickDirection = 0;
 
@@ -1055,7 +1261,11 @@ function checkGamepadInput() {
   camera.updateProjectionMatrix();
   updateFogByFov();
 
-  // A键只在刚按下时触发一次
+  // ===============================
+  // A键确认
+  // 只在刚按下时触发一次
+  // ===============================
+
   if (aButtonPressed && !previousAButtonPressed) {
     handleAButtonClick();
   }
