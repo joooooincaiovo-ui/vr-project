@@ -53,45 +53,55 @@ const levelDisplayNames = {
 
 const levelData = {
   floor1: {
-    title: "F1 一楼走廊",
-    objects: [
-      {
-        id: "f1-fish",
-        label: "金鱼",
-        soundName: "门口鱼缸水流声",
-        audioSrc: "./assets/sounds/f1-01.mp3",
-        position: createPositionByAngle(-45, 8, 5)
-      },
-      {
-        id: "f1-cricket",
-        label: "蛐蛐",
-        soundName: "蝉鸣声",
-        audioSrc: "./assets/sounds/f1-02.mp3",
-        position: createPositionByAngle(25, 5, 5)
-      },
-      {
-        id: "f1-lilac",
-        label: "紫丁香",
-        soundName: "寂静中的风声",
-        audioSrc: "./assets/sounds/f1-03.mp3",
-        position: createPositionByAngle(90, 10, 5)
-      },
-      {
-        id: "f1-red-door",
-        label: "红门",
-        soundName: "雨声",
-        audioSrc: "./assets/sounds/f1-04.mp3",
-        position: createPositionByAngle(155, 6, 5)
-      },
-      {
-        id: "f1-tile",
-        label: "花砖",
-        soundName: "风吹树叶的声音",
-        audioSrc: "./assets/sounds/f1-05.mp3",
-        position: createPositionByAngle(-140, 12, 5)
-      }
-    ]
-  },
+  title: "F1 一楼走廊",
+  objects: [
+    {
+  id: "f1-fish",
+  label: "金鱼",
+  soundName: "门口鱼缸水流声",
+  audioSrc: "./assets/sounds/f1-01.mp3",
+  imageSrc: "./assets/f1-images/f1-fish.png",
+  solidOutlineSrc: "./assets/f1-images/f1-fish-selected.png",
+  position: createPositionByAngle(-45, 8, 5)
+},
+    {
+      id: "f1-moth",
+      label: "蛾子",
+      soundName: "蝉鸣声",
+      audioSrc: "./assets/sounds/f1-02.mp3",
+      imageSrc: "./assets/f1-images/f1-moth.png",
+      solidOutlineSrc: "./assets/f1-images/f1-moth-selected.png",
+      position: createPositionByAngle(25, 5, 5)
+    },
+    {
+      id: "f1-lilac",
+      label: "紫丁香",
+      soundName: "寂静中的风声",
+      audioSrc: "./assets/sounds/f1-03.mp3",
+      imageSrc: "./assets/f1-images/f1-flower.png",
+      solidOutlineSrc: "./assets/f1-images/f1-flower-selected.png",
+      position: createPositionByAngle(90, 10, 5)
+    },
+    {
+      id: "f1-red-door",
+      label: "红门",
+      soundName: "雨声",
+      audioSrc: "./assets/sounds/f1-04.mp3",
+      imageSrc: "./assets/f1-images/f1-reddoor.png",
+      solidOutlineSrc: "./assets/f1-images/f1-reddoor-selected.png",
+      position: createPositionByAngle(155, 6, 5)
+    },
+    {
+      id: "f1-tile",
+      label: "花砖",
+      soundName: "风吹树叶的声音",
+      audioSrc: "./assets/sounds/f1-05.mp3",
+      imageSrc: "./assets/f1-images/f1-tili.png",
+      solidOutlineSrc: "./assets/f1-images/f1-tili-selected.png",
+      position: createPositionByAngle(-140, 12, 5)
+    }
+  ]
+},
 
   floor2: {
     title: "F2 室外空地",
@@ -394,96 +404,20 @@ function loadLevel(levelName) {
 }
 
 // ===============================
-// 清除上一关物体
-// ===============================
-
-function clearInteractiveObjects() {
-  interactiveObjects.forEach((mesh) => {
-    if (mesh.userData.parentGroup) {
-      scene.remove(mesh.userData.parentGroup);
-    }
-  });
-
-  interactiveObjects.length = 0;
-  selectableObjects.length = 0;
-
-  finishHintSprite = null;
-
-if (finishHintTimer) {
-  clearTimeout(finishHintTimer);
-  finishHintTimer = null;
-}
-}
-
-// ===============================
-// 创建漂浮意象
-// 当前先用球体占位
-// 之后可以把球体替换成图片、模型或更抽象的造型
-// ===============================
-
-function createFloatingObject(item, index) {
-  const group = new THREE.Group();
-  group.position.copy(item.position);
-
-  // 新增：记录物体初始位置，后面漂浮动画会用到
-  group.userData.basePosition = item.position.clone();
-
-  const geometry = new THREE.SphereGeometry(0.22, 32, 32);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.82
-  });
-
-  const sphere = new THREE.Mesh(geometry, material);
-
-  sphere.userData.type = "sound-object";
-  sphere.userData.soundId = item.id;
-  sphere.userData.label = item.label;
-  sphere.userData.soundName = item.soundName;
-  sphere.userData.audioSrc = item.audioSrc;
-  sphere.userData.parentGroup = group;
-
-  group.add(sphere);
-
-  const dashedRing = createDashedSelectionRing();
-  dashedRing.visible = false;
-  group.add(dashedRing);
-
-  const solidRing = createSolidConfirmedRing();
-  solidRing.visible = false;
-  group.add(solidRing);
-
-  const labelSprite = createTextSprite(item.label);
-  labelSprite.position.set(0, -0.55, 0);
-  group.add(labelSprite);
-
-  group.userData.floatOffset = index * 0.8;
-  group.userData.mainMesh = sphere;
-  group.userData.dashedRing = dashedRing;
-  group.userData.solidRing = solidRing;
-  group.userData.labelSprite = labelSprite;
-
-  interactiveObjects.push(sphere);
-  selectableObjects.push(sphere);
-
-  return group;
-}
-
-// ===============================
 // 创建完成按钮
 // ===============================
 
 function createFinishButton() {
   const group = new THREE.Group();
 
-  // 初始位置随便给一个，后面每一帧都会自动跟随摄像机
+  // 初始位置随便给一个，后面每一帧会自动跟随摄像机
   group.position.copy(createPositionByAngle(0, -12, 4.5));
 
-  // 新增：标记这是一个跟随摄像机的按钮
+  // 标记这是一个跟随摄像机的按钮
   group.userData.followCamera = true;
 
   const geometry = new THREE.TorusGeometry(0.32, 0.035, 16, 48);
+
   const material = new THREE.MeshBasicMaterial({
     color: 0xffffff,
     transparent: true,
@@ -495,6 +429,10 @@ function createFinishButton() {
   ring.userData.type = "finish-button";
   ring.userData.label = "完成";
   ring.userData.parentGroup = group;
+
+  // 新增：记录完成按钮的基础大小
+  // 后面 updateObjectVisualStates 里会用它来控制选中放大
+  ring.userData.baseScale = new THREE.Vector3(1, 1, 1);
 
   group.add(ring);
 
@@ -522,6 +460,145 @@ function createFinishButton() {
   return group;
 }
 
+// ===============================
+// 清除上一关物体
+// ===============================
+
+function clearInteractiveObjects() {
+  interactiveObjects.forEach((mesh) => {
+    if (mesh.userData.parentGroup) {
+      scene.remove(mesh.userData.parentGroup);
+    }
+  });
+
+  interactiveObjects.length = 0;
+  selectableObjects.length = 0;
+
+  finishHintSprite = null;
+
+if (finishHintTimer) {
+  clearTimeout(finishHintTimer);
+  finishHintTimer = null;
+}
+}
+
+// ===============================
+// 创建漂浮意象
+// 当前先用球体占位
+// 之后可以把球体替换成图片、模型或更抽象的造型
+// ===============================
+
+// ===============================
+// 创建漂浮意象（支持预选白色滤镜 + 确认实线轮廓）
+// ===============================
+function createFloatingObject(item, index) {
+  const group = new THREE.Group();
+  group.position.copy(item.position);
+  group.userData.basePosition = item.position.clone();
+
+  const imageSize = 1.35;
+
+  const texture = new THREE.TextureLoader().load(item.imageSrc);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const mainMaterial = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+    depthTest: false
+  });
+
+  const mainMesh = new THREE.Sprite(mainMaterial);
+  mainMesh.scale.set(imageSize, imageSize, 1);
+  mainMesh.renderOrder = 1;
+
+  mainMesh.userData.baseScale = new THREE.Vector3(imageSize, imageSize, 1);
+  mainMesh.userData.type = "sound-object";
+  mainMesh.userData.soundId = item.id;
+  mainMesh.userData.label = item.label;
+  mainMesh.userData.soundName = item.soundName;
+  mainMesh.userData.audioSrc = item.audioSrc;
+  mainMesh.userData.parentGroup = group;
+
+  group.add(mainMesh);
+
+  // ============================
+  // 预选效果：白色滤镜层
+  // 调整预选明显程度主要看这里的 opacity
+  // ============================
+  const highlightMaterial = new THREE.SpriteMaterial({
+    map: texture,
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.68,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending
+  });
+
+  const highlightSprite = new THREE.Sprite(highlightMaterial);
+  highlightSprite.scale.set(imageSize, imageSize, 1);
+  highlightSprite.renderOrder = 2;
+  highlightSprite.visible = false;
+
+  group.add(highlightSprite);
+  group.userData.highlightSprite = highlightSprite;
+
+  // ============================
+  // 确认效果：白色实线轮廓贴图
+  // 调整确认描边明显程度主要看这里的 opacity 和 outlineScale
+  // ============================
+  if (item.solidOutlineSrc) {
+    const solidTexture = new THREE.TextureLoader().load(item.solidOutlineSrc);
+    solidTexture.colorSpace = THREE.SRGBColorSpace;
+
+    const solidMaterial = new THREE.SpriteMaterial({
+      map: solidTexture,
+      transparent: true,
+      opacity: 1,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    const solidOutlineSprite = new THREE.Sprite(solidMaterial);
+
+    // 描边贴图可以比原图稍微大一点点，更容易看见
+    const outlineScale = 1.08;
+    solidOutlineSprite.scale.set(
+      imageSize * outlineScale,
+      imageSize * outlineScale,
+      1
+    );
+
+    solidOutlineSprite.renderOrder = 3;
+    solidOutlineSprite.visible = false;
+
+    group.add(solidOutlineSprite);
+    group.userData.solidOutlineSprite = solidOutlineSprite;
+    group.userData.solidOutlineBaseScale = new THREE.Vector3(
+      imageSize * outlineScale,
+      imageSize * outlineScale,
+      1
+    );
+  }
+
+  const labelSprite = createTextSprite(item.label);
+  labelSprite.position.set(0, -1.05, 0);
+  labelSprite.renderOrder = 4;
+  group.add(labelSprite);
+
+  group.userData.floatOffset = index * 0.8;
+  group.userData.mainMesh = mainMesh;
+  group.userData.labelSprite = labelSprite;
+  group.userData.highlightBaseScale = new THREE.Vector3(imageSize, imageSize, 1);
+
+  interactiveObjects.push(mainMesh);
+  selectableObjects.push(mainMesh);
+
+  return group;
+}
 // ===============================
 // 新增：虚线预选描边
 // ===============================
@@ -894,9 +971,6 @@ function updateObjectVisualStates() {
     const group = mesh.userData.parentGroup;
     if (!group) return;
 
-    const dashedRing = group.userData.dashedRing;
-    const solidRing = group.userData.solidRing;
-
     const isSelected = index === selectedIndex;
     const isSoundObject = mesh.userData.type === "sound-object";
     const isFinishButton = mesh.userData.type === "finish-button";
@@ -904,12 +978,11 @@ function updateObjectVisualStates() {
     const isConfirmed = isSoundObject && confirmedSoundIds.has(soundId);
 
     // ===============================
-    // 新增：完成按钮始终跟随视角前方
+    // 完成按钮跟随摄像机
     // ===============================
     if (group.userData.followCamera) {
       updateFinishButtonFollowCamera(group);
     } else {
-      // 普通意象：基于初始位置做轻微漂浮，不会无限漂移
       const basePosition = group.userData.basePosition;
 
       if (basePosition) {
@@ -923,62 +996,70 @@ function updateObjectVisualStates() {
         );
       }
 
-      // 新增：所有意象永远面朝摄像机
       group.quaternion.copy(camera.quaternion);
     }
 
     // ===============================
-    // 虚线预选描边
-    // 当前选中、且不是已确认声音物体时显示
+    // 缩放规则
     // ===============================
-    if (dashedRing) {
-      dashedRing.visible = isSelected && !isConfirmed;
+    const baseScale = mesh.userData.baseScale || new THREE.Vector3(1, 1, 1);
 
-      if (dashedRing.visible) {
-        updateDashedRingMarching(dashedRing, time);
-      }
-    }
+    let scaleMultiplier = 1;
 
-    // ===============================
-    // 实线确认描边
-    // 已确认的声音物体永远显示
-    // 完成按钮不保持确认状态
-    // ===============================
-    if (solidRing) {
-      solidRing.visible = isConfirmed;
-
-      if (isConfirmed) {
-        // 轻微呼吸感，不再硬转
-        const glowScale = 1 + Math.sin(time * 3) * 0.035;
-        solidRing.scale.setScalar(glowScale);
-      } else {
-        solidRing.scale.setScalar(1);
-      }
-    }
-
-    // ===============================
-    // 缩放规则：
-    // 只有当前摇杆停留的物体才放大
-    // ===============================
     if (isSelected) {
       if (isFinishButton) {
-        mesh.scale.setScalar(1.28);
+        scaleMultiplier = 1.28;
       } else {
-        mesh.scale.setScalar(1.38);
+        scaleMultiplier = 1.16;
       }
-    } else {
-      mesh.scale.setScalar(1);
+    }
+
+    mesh.scale.copy(baseScale).multiplyScalar(scaleMultiplier);
+
+    // 预选白色滤镜显示
+    const highlightSprite = group.userData.highlightSprite;
+
+    if (highlightSprite) {
+      highlightSprite.visible = isSelected && !isConfirmed;
+
+      const highlightBaseScale =
+        group.userData.highlightBaseScale || baseScale;
+
+      highlightSprite.scale
+        .copy(highlightBaseScale)
+        .multiplyScalar(scaleMultiplier);
+    }
+
+    // 确认白色实线描边显示
+    const solidOutlineSprite = group.userData.solidOutlineSprite;
+
+    if (solidOutlineSprite) {
+      solidOutlineSprite.visible = isConfirmed;
+
+      const solidBaseScale =
+        group.userData.solidOutlineBaseScale || baseScale;
+
+      const breatheScale = isConfirmed
+        ? 1 + Math.sin(time * 2.4) * 0.025
+        : 1;
+
+      solidOutlineSprite.scale
+        .copy(solidBaseScale)
+        .multiplyScalar(scaleMultiplier * breatheScale);
+
+      solidOutlineSprite.material.opacity =
+        0.85 + Math.sin(time * 2.4) * 0.15;
     }
 
     // ===============================
-    // 透明度规则
+    // 原图透明度
     // ===============================
     if (isSelected) {
       mesh.material.opacity = 1;
     } else if (isConfirmed) {
-      mesh.material.opacity = 0.95;
+      mesh.material.opacity = 0.96;
     } else {
-      mesh.material.opacity = 0.78;
+      mesh.material.opacity = 0.86;
     }
   });
 }
