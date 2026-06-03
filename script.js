@@ -254,6 +254,80 @@ window.addEventListener("DOMContentLoaded", () => {
 // 加载流程
 // ===============================
 
+function initLoadingFlow() {
+  const loadingPanel = document.querySelector("#loading-panel");
+  const detectPanel = document.querySelector("#detect-panel");
+  const loadingBar = document.querySelector("#loading-bar");
+  const loadingText = document.querySelector("#loading-text");
+
+  let progress = 0;
+  const totalTime = 5000;
+  const intervalTime = 50;
+  const step = 100 / (totalTime / intervalTime);
+
+  const timer = setInterval(() => {
+    progress += step;
+
+    if (progress >= 100) {
+      progress = 100;
+      clearInterval(timer);
+
+      setTimeout(() => {
+        loadingPanel.classList.add("hidden");
+        detectPanel.classList.remove("hidden");
+        startControllerDetection();
+      }, 300);
+    }
+
+    loadingBar.style.width = `${progress}%`;
+    loadingText.textContent = `Loading ${Math.round(progress)}%`;
+  }, intervalTime);
+}
+
+function startControllerDetection() {
+  const detectText = document.querySelector("#detect-text");
+
+  let elapsed = 0;
+  const detectDuration = 5000;
+  const intervalTime = 250;
+
+  const timer = setInterval(() => {
+    elapsed += intervalTime;
+
+    const gamepad = findConnectedGamepad();
+
+    if (gamepad) {
+      clearInterval(timer);
+      gamepadIndex = gamepad.index;
+      controlMode = "gamepad";
+      showControllerGuide();
+      return;
+    }
+
+    const leftSeconds = Math.max(0, Math.ceil((detectDuration - elapsed) / 1000));
+    detectText.textContent = `正在检测手柄连接，请稍候... ${leftSeconds}s`;
+
+    if (elapsed >= detectDuration) {
+      clearInterval(timer);
+      controlMode = "gaze";
+      showGazeGuide();
+    }
+  }, intervalTime);
+}
+
+function showControllerGuide() {
+  document.querySelector("#detect-panel").classList.add("hidden");
+  document.querySelector("#controller-guide-panel").classList.remove("hidden");
+}
+
+function showGazeGuide() {
+  document.querySelector("#detect-panel").classList.add("hidden");
+  document.querySelector("#gaze-guide-panel").classList.remove("hidden");
+}
+// ===============================
+// 加载流程
+// ===============================
+
 // ===============================
 // 手机教学页进入场景逻辑改进
 // ===============================
@@ -343,10 +417,7 @@ function preloadAssets() {
 // ===============================
 // 页面加载时调用
 // ===============================
-window.addEventListener("DOMContentLoaded", () => {
-  setupGuideButtonsAndFullScreen();
-  preloadAssets();
-});
+
 
 function showControllerGuide() {
   document.querySelector("#detect-panel").classList.add("hidden");
