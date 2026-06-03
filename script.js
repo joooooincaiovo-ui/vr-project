@@ -1,4 +1,29 @@
 // ===============================
+// 手机访问提示隐藏导航栏
+// ===============================
+window.addEventListener("load", () => {
+  // 仅在移动端触发
+  if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    const hideNav = confirm("检测到移动设备，是否隐藏浏览器顶部导航栏以便更好操作VR按钮？");
+
+    if (hideNav) {
+      // 请求全屏
+      const docEl = document.documentElement;
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) { /* Safari */
+        docEl.webkitRequestFullscreen();
+      } else if (docEl.msRequestFullscreen) { /* IE11 */
+        docEl.msRequestFullscreen();
+      }
+
+      // 或者简单调整 body 样式，避免导航栏挡住内容
+      document.body.style.marginTop = "0";
+      document.body.style.overflow = "hidden";
+    }
+  }
+});
+// ===============================
 // 基础变量
 // ===============================
 
