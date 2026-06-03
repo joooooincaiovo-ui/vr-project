@@ -1,44 +1,46 @@
-import * as THREE from "https://unpkg.com/three@0.158.0/build/three.module.js";
-import { OrbitControls } from "https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js";
+// ===============================
+// 基础变量
+// ===============================
 
-let scene, camera, renderer, controls;
+const THREE = AFRAME.THREE;
+
+let sceneEl = null;
+let levelRoot = null;
+let cameraEl = null;
+let cameraObject = null;
 
 let gamepadIndex = null;
+let controlMode = "gaze"; // "gamepad" 或 "gaze"
+let hasEnteredScene = false;
 
-let targetFov = 75;
-const minFov = 35;
-const maxFov = 90;
-const zoomSpeed = 0.8;
-const deadZone = 0.15;
-
-let fogOverlay = null;
-let isLevelTransitioning = false;
-
-let useDeviceOrientation = false;
-let latestDeviceOrientation = null;
-
-let playMode = null;
-
-let leftCamera, rightCamera;
-const eyeOffset = 0.03;
-
-// ===============================
-// 移动端 VR 盒子显示参数
-// ===============================
-
-const mobileEyeScale = 0.72;
-const mobileEyeGap = 80;
-const mobileEyeRadius = 999;
-
-// ===============================
-// 三关场景系统
-// ===============================
-
-const levelOrder = ["floor1", "floor2", "floor3"];
 let currentLevelIndex = 0;
+const levelOrder = ["floor1", "floor2", "floor3"];
 let currentLevelName = levelOrder[currentLevelIndex];
 
 let panoramas = {};
+let isLevelTransitioning = false;
+
+const interactiveObjects = [];
+let selectableObjects = [];
+let selectedIndex = 0;
+
+const activeAudios = {};
+const confirmedSoundIds = new Set();
+
+let previousAButtonPressed = false;
+let previousStickDirection = 0;
+let lastStickMoveTime = 0;
+const stickMoveCooldown = 260;
+let previousDownStickPressed = false;
+
+let finishHintEl = null;
+let finishHintTimer = null;
+
+const playedSoundRecords = {
+  floor1: [],
+  floor2: [],
+  floor3: []
+};
 
 const levelDisplayNames = {
   floor1: "F1 一楼走廊",
@@ -47,61 +49,75 @@ const levelDisplayNames = {
 };
 
 // ===============================
-// 每关意象与声音配置
-// 后续主要改这里
+// 可调节视觉参数
+// ===============================
+
+const IMAGE_SIZE = 1.35;
+
+// 预选白色滤镜强度：越大越白，建议 0.55 - 0.9
+const PRESELECT_WHITE_OPACITY = 0.72;
+
+// 预选放大程度：越大越明显，建议 1.08 - 1.25
+const PRESELECT_SCALE = 1.16;
+
+// 确认描边贴图大小：如果描边看不明显，可以调到 1.12 / 1.18
+const OUTLINE_SCALE = 1.1;
+
+// ===============================
+// 三关数据
 // ===============================
 
 const levelData = {
   floor1: {
-  title: "F1 一楼走廊",
-  objects: [
-    {
-  id: "f1-fish",
-  label: "金鱼",
-  soundName: "门口鱼缸水流声",
-  audioSrc: "./assets/sounds/f1-01.mp3",
-  imageSrc: "./assets/f1-images/f1-fish.png",
-  solidOutlineSrc: "./assets/f1-images/f1-fish-selected.png",
-  position: createPositionByAngle(-45, 8, 5)
-},
-    {
-      id: "f1-moth",
-      label: "蛾子",
-      soundName: "蝉鸣声",
-      audioSrc: "./assets/sounds/f1-02.mp3",
-      imageSrc: "./assets/f1-images/f1-moth.png",
-      solidOutlineSrc: "./assets/f1-images/f1-moth-selected.png",
-      position: createPositionByAngle(25, 5, 5)
-    },
-    {
-      id: "f1-lilac",
-      label: "紫丁香",
-      soundName: "寂静中的风声",
-      audioSrc: "./assets/sounds/f1-03.mp3",
-      imageSrc: "./assets/f1-images/f1-flower.png",
-      solidOutlineSrc: "./assets/f1-images/f1-flower-selected.png",
-      position: createPositionByAngle(90, 10, 5)
-    },
-    {
-      id: "f1-red-door",
-      label: "红门",
-      soundName: "雨声",
-      audioSrc: "./assets/sounds/f1-04.mp3",
-      imageSrc: "./assets/f1-images/f1-reddoor.png",
-      solidOutlineSrc: "./assets/f1-images/f1-reddoor-selected.png",
-      position: createPositionByAngle(155, 6, 5)
-    },
-    {
-      id: "f1-tile",
-      label: "花砖",
-      soundName: "风吹树叶的声音",
-      audioSrc: "./assets/sounds/f1-05.mp3",
-      imageSrc: "./assets/f1-images/f1-tili.png",
-      solidOutlineSrc: "./assets/f1-images/f1-tili-selected.png",
-      position: createPositionByAngle(-140, 12, 5)
-    }
-  ]
-},
+    title: "F1 一楼走廊",
+    objects: [
+      {
+        id: "f1-fish",
+        label: "金鱼",
+        soundName: "门口鱼缸水流声",
+        audioSrc: "./assets/sounds/f1-01.mp3",
+        imageSrc: "./assets/f1-images/f1-fish.png",
+        solidOutlineSrc: "./assets/f1-images/f1-fish-selected.png",
+        position: createPositionByAngle(-45, 8, 5)
+      },
+      {
+        id: "f1-cricket",
+        label: "蛐蛐",
+        soundName: "蝉鸣声",
+        audioSrc: "./assets/sounds/f1-02.mp3",
+        imageSrc: "./assets/f1-images/f1-moth.png",
+        solidOutlineSrc: "./assets/f1-images/f1-moth-selected.png",
+        position: createPositionByAngle(25, 5, 5)
+      },
+      {
+        id: "f1-lilac",
+        label: "紫丁香",
+        soundName: "寂静中的风声",
+        audioSrc: "./assets/sounds/f1-03.mp3",
+        imageSrc: "./assets/f1-images/f1-flower.png",
+        solidOutlineSrc: "./assets/f1-images/f1-flower-selected.png",
+        position: createPositionByAngle(90, 10, 5)
+      },
+      {
+        id: "f1-red-door",
+        label: "红门",
+        soundName: "雨声",
+        audioSrc: "./assets/sounds/f1-04.mp3",
+        imageSrc: "./assets/f1-images/f1-reddoor.png",
+        solidOutlineSrc: "./assets/f1-images/f1-reddoor-selected.png",
+        position: createPositionByAngle(155, 6, 5)
+      },
+      {
+        id: "f1-tile",
+        label: "花砖",
+        soundName: "风吹树叶的声音",
+        audioSrc: "./assets/sounds/f1-05.mp3",
+        imageSrc: "./assets/f1-images/f1-tili.png",
+        solidOutlineSrc: "./assets/f1-images/f1-tili-selected.png",
+        position: createPositionByAngle(-140, 12, 5)
+      }
+    ]
+  },
 
   floor2: {
     title: "F2 室外空地",
@@ -187,44 +203,35 @@ const levelData = {
 };
 
 // ===============================
-// 交互对象状态
-// ===============================
-
-const interactiveObjects = [];
-let selectableObjects = [];
-let selectedIndex = 0;
-
-const activeAudios = {};
-const confirmedSoundIds = new Set();
-
-let finishHintSprite = null;
-let finishHintTimer = null;
-
-const playedSoundRecords = {
-  floor1: [],
-  floor2: [],
-  floor3: []
-};
-
-// A键防止长按连续触发
-let previousAButtonPressed = false;
-
-// 摇杆防止连续快速跳动
-let previousStickDirection = 0;
-let lastStickMoveTime = 0;
-const stickMoveCooldown = 260;
-
-let previousDownStickPressed = false;
-
-// ===============================
 // 初始化
 // ===============================
 
-initLoading();
+window.addEventListener("DOMContentLoaded", () => {
+  sceneEl = document.querySelector("#vr-scene");
+  levelRoot = document.querySelector("#level-root");
+  cameraEl = document.querySelector("#main-camera");
 
-function initLoading() {
+  sceneEl.addEventListener("loaded", () => {
+    cameraObject = cameraEl.object3D;
+    loadPanoramas();
+  });
+
+  initLoadingFlow();
+  setupGuideButtons();
+  setupKeyboardInput();
+  setupGamepadEvents();
+  setupImageFallbacks();
+
+  requestAnimationFrame(updateLoop);
+});
+
+// ===============================
+// 加载流程
+// ===============================
+
+function initLoadingFlow() {
   const loadingPanel = document.querySelector("#loading-panel");
-  const modePanel = document.querySelector("#mode-panel");
+  const detectPanel = document.querySelector("#detect-panel");
   const loadingBar = document.querySelector("#loading-bar");
   const loadingText = document.querySelector("#loading-text");
 
@@ -242,76 +249,105 @@ function initLoading() {
 
       setTimeout(() => {
         loadingPanel.classList.add("hidden");
-        modePanel.classList.remove("hidden");
+        detectPanel.classList.remove("hidden");
+        startControllerDetection();
       }, 300);
     }
 
     loadingBar.style.width = `${progress}%`;
     loadingText.textContent = `Loading ${Math.round(progress)}%`;
   }, intervalTime);
+}
 
-  document.querySelector("#pc-mode-btn").addEventListener("click", () => {
-    startExperience("pc");
-  });
+function startControllerDetection() {
+  const detectText = document.querySelector("#detect-text");
 
-  document.querySelector("#mobile-mode-btn").addEventListener("click", () => {
-    startExperience("mobile");
+  let elapsed = 0;
+  const detectDuration = 5000;
+  const intervalTime = 250;
+
+  const timer = setInterval(() => {
+    elapsed += intervalTime;
+
+    const gamepad = findConnectedGamepad();
+
+    if (gamepad) {
+      clearInterval(timer);
+      gamepadIndex = gamepad.index;
+      controlMode = "gamepad";
+      showControllerGuide();
+      return;
+    }
+
+    const leftSeconds = Math.max(0, Math.ceil((detectDuration - elapsed) / 1000));
+    detectText.textContent = `正在检测手柄连接，请稍候... ${leftSeconds}s`;
+
+    if (elapsed >= detectDuration) {
+      clearInterval(timer);
+      controlMode = "gaze";
+      showGazeGuide();
+    }
+  }, intervalTime);
+}
+
+function showControllerGuide() {
+  document.querySelector("#detect-panel").classList.add("hidden");
+  document.querySelector("#controller-guide-panel").classList.remove("hidden");
+}
+
+function showGazeGuide() {
+  document.querySelector("#detect-panel").classList.add("hidden");
+  document.querySelector("#gaze-guide-panel").classList.remove("hidden");
+}
+
+function setupGuideButtons() {
+  document.querySelector("#enter-controller-btn").addEventListener("click", enterScene);
+  document.querySelector("#enter-gaze-btn").addEventListener("click", enterScene);
+}
+
+function setupImageFallbacks() {
+  const guideImages = document.querySelectorAll(".guide-image");
+
+  guideImages.forEach((image) => {
+    image.addEventListener("error", () => {
+      image.style.display = "none";
+    });
   });
 }
 
-function startExperience(mode) {
-  playMode = mode;
+function enterScene() {
+  if (hasEnteredScene) return;
+
+  hasEnteredScene = true;
 
   document.querySelector("#start-screen").classList.add("hidden");
   document.querySelector("#info").classList.remove("hidden");
+  sceneEl.classList.remove("hidden");
 
-  if (mode === "mobile") {
-    document.querySelector("#orientation-btn").classList.remove("hidden");
-    document.querySelector("#vr-frame-overlay").classList.remove("hidden");
-    updateInfo("移动端模式：请横屏并点击开启手机陀螺仪");
+  const gazeCursor = document.querySelector("#gaze-cursor");
+
+  if (controlMode === "gaze") {
+    gazeCursor.classList.remove("hidden");
+    gazeCursor.setAttribute("visible", true);
+    updateInfo("眼神控制：看向意象预选，点击屏幕确认 / 取消");
   } else {
-    document.querySelector("#vr-frame-overlay").classList.add("hidden");
-    updateInfo("PC模式：鼠标拖动环顾场景 / A确认 / 左右键切换 / LT放大 / RT缩小");
+    gazeCursor.classList.add("hidden");
+    gazeCursor.setAttribute("visible", false);
+    updateInfo("手柄模式：左摇杆切换 / 向下选择完成 / A确认");
   }
 
-  initScene();
-  animate();
+  currentLevelIndex = 0;
+  currentLevelName = levelOrder[currentLevelIndex];
+
+  setPanorama(currentLevelName);
+  loadLevel(currentLevelName);
 }
 
-function initScene() {
-  scene = new THREE.Scene();
+// ===============================
+// A-Frame / Three.js 六面图背景
+// ===============================
 
-  camera = new THREE.PerspectiveCamera(
-    targetFov,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-  );
-
-  camera.position.set(0, 0, 0.1);
-
-  renderer = new THREE.WebGLRenderer({
-    antialias: true
-  });
-
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.autoClear = false;
-
-  document.body.appendChild(renderer.domElement);
-
-  controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableZoom = false;
-  controls.enablePan = false;
-  controls.rotateSpeed = -0.35;
-
-  fogOverlay = document.querySelector("#fog-overlay");
-
-  // ===============================
-  // 修改：三关六面图加载
-  // 原本 initScene 里的 const texture = loader.load(...) 已经删掉
-  // ===============================
-
+function loadPanoramas() {
   const loader = new THREE.CubeTextureLoader();
   loader.setPath("./assets/images/");
 
@@ -326,42 +362,32 @@ function initScene() {
     ]),
 
     floor2: loader.load([
-      "2-4.png", // px
-      "2-1.png", // nx
-      "2-5.png", // py
-      "2-2.png", // ny
-      "2-6.png", // pz
-      "2-3.png"  // nz
+      "2-4.png",
+      "2-1.png",
+      "2-5.png",
+      "2-2.png",
+      "2-6.png",
+      "2-3.png"
     ]),
 
     floor3: loader.load([
-      "3-4.png", // px
-      "3-1.png", // nx
-      "3-5.png", // py
-      "3-2.png", // ny
-      "3-6.png", // pz
-      "3-3.png"  // nz
+      "3-4.png",
+      "3-1.png",
+      "3-5.png",
+      "3-2.png",
+      "3-6.png",
+      "3-3.png"
     ])
   };
+}
 
-  scene.background = panoramas.floor1;
-
-  setupStereoCameras();
-  setupGamepadTest();
-  setupDeviceOrientation();
-
-  loadLevel("floor1");
-
-  // 键盘测试：
-  // ArrowLeft / ArrowRight = 模拟摇杆左右切换
-  // Space / Enter = 模拟 A 键
-  window.addEventListener("keydown", handleKeyboardTest);
-
-  window.addEventListener("resize", onWindowResize);
+function setPanorama(levelName) {
+  if (!sceneEl || !panoramas[levelName]) return;
+  sceneEl.object3D.background = panoramas[levelName];
 }
 
 // ===============================
-// 根据角度生成物体在VR空间中的位置
+// 根据角度生成物体位置
 // ===============================
 
 function createPositionByAngle(yawDeg, pitchDeg, radius) {
@@ -375,8 +401,12 @@ function createPositionByAngle(yawDeg, pitchDeg, radius) {
   return new THREE.Vector3(x, y, z);
 }
 
+function vectorToPositionString(vector) {
+  return `${vector.x} ${vector.y} ${vector.z}`;
+}
+
 // ===============================
-// 加载当前关卡
+// 加载关卡
 // ===============================
 
 function loadLevel(levelName) {
@@ -385,22 +415,148 @@ function loadLevel(levelName) {
   currentLevelName = levelName;
 
   const data = levelData[levelName];
-
   if (!data) return;
 
   data.objects.forEach((item, index) => {
-    const objectGroup = createFloatingObject(item, index);
-    scene.add(objectGroup);
+    const objectEntity = createFloatingObject(item, index);
+    levelRoot.appendChild(objectEntity);
   });
 
   const finishButton = createFinishButton();
-  scene.add(finishButton);
+  levelRoot.appendChild(finishButton);
 
-  // 每次进入新关卡，随机选择一个意象作为初始预选
-  // 注意：只从声音意象里随机，不从“完成”按钮里随机
   selectedIndex = Math.floor(Math.random() * data.objects.length);
-
   updateSelectionInfo();
+  updateObjectVisualStates();
+}
+
+function clearInteractiveObjects() {
+  interactiveObjects.forEach((objectData) => {
+    objectData.el.remove();
+  });
+
+  interactiveObjects.length = 0;
+  selectableObjects.length = 0;
+
+  finishHintEl = null;
+
+  if (finishHintTimer) {
+    clearTimeout(finishHintTimer);
+    finishHintTimer = null;
+  }
+}
+
+// ===============================
+// 创建漂浮意象
+// ===============================
+
+function createFloatingObject(item, index) {
+  const group = document.createElement("a-entity");
+  group.classList.add("interactive");
+
+  group.setAttribute("position", vectorToPositionString(item.position));
+
+  group.objectData = {
+    type: "sound-object",
+    item,
+    id: item.id,
+    label: item.label,
+    soundName: item.soundName,
+    audioSrc: item.audioSrc,
+    basePosition: item.position.clone(),
+    floatOffset: index * 0.8,
+    baseScale: 1,
+    confirmed: false
+  };
+
+  let mainImage = null;
+
+  if (item.imageSrc) {
+    mainImage = document.createElement("a-image");
+    mainImage.classList.add("interactive-hitbox");
+    mainImage.setAttribute("src", item.imageSrc);
+    mainImage.setAttribute("width", IMAGE_SIZE);
+    mainImage.setAttribute("height", IMAGE_SIZE);
+    
+    mainImage.setAttribute(
+      "material",
+      "transparent: true; opacity: 0.95; depthWrite: false; depthTest: false"
+    );
+    mainImage.object3D.renderOrder = 1;
+    group.appendChild(mainImage);
+  } else {
+    mainImage = document.createElement("a-sphere");
+    mainImage.classList.add("interactive-hitbox");
+    mainImage.setAttribute("radius", "0.22");
+    mainImage.setAttribute("color", "#ffffff");
+    mainImage.setAttribute("material", "transparent: true; opacity: 0.82");
+    mainImage.object3D.renderOrder = 1;
+    group.appendChild(mainImage);
+  }
+
+  const highlightImage = document.createElement("a-image");
+
+  if (item.imageSrc) {
+    highlightImage.setAttribute("src", item.imageSrc);
+    highlightImage.setAttribute("width", IMAGE_SIZE);
+    highlightImage.setAttribute("height", IMAGE_SIZE);
+    highlightImage.setAttribute(
+      "material",
+      `transparent: true; opacity: ${PRESELECT_WHITE_OPACITY}; color: #ffffff; blending: additive; depthWrite: false; depthTest: false`
+    );
+  } else {
+    highlightImage.setAttribute("width", 0.7);
+    highlightImage.setAttribute("height", 0.7);
+    highlightImage.setAttribute(
+      "material",
+      `transparent: true; opacity: ${PRESELECT_WHITE_OPACITY}; color: #ffffff; depthWrite: false; depthTest: false`
+    );
+  }
+
+  highlightImage.setAttribute("visible", false);
+  highlightImage.setAttribute("position", "0 0 0.015");
+  highlightImage.object3D.renderOrder = 2;
+  group.appendChild(highlightImage);
+
+  let solidOutlineImage = null;
+
+  if (item.solidOutlineSrc) {
+    solidOutlineImage = document.createElement("a-image");
+    solidOutlineImage.setAttribute("src", item.solidOutlineSrc);
+    solidOutlineImage.setAttribute("width", IMAGE_SIZE * OUTLINE_SCALE);
+    solidOutlineImage.setAttribute("height", IMAGE_SIZE * OUTLINE_SCALE);
+    solidOutlineImage.setAttribute(
+      "material",
+      "transparent: true; opacity: 1; blending: additive; depthWrite: false; depthTest: false"
+    );
+    solidOutlineImage.setAttribute("position", "0 0 0.03");
+    solidOutlineImage.setAttribute("visible", false);
+    solidOutlineImage.object3D.renderOrder = 3;
+    group.appendChild(solidOutlineImage);
+  }
+
+  const label = createTextLabel(item.label);
+  label.setAttribute("position", "0 -1.05 0.04");
+  label.object3D.renderOrder = 4;
+  group.appendChild(label);
+
+  group.objectData.mainImage = mainImage;
+  group.objectData.highlightImage = highlightImage;
+  group.objectData.solidOutlineImage = solidOutlineImage;
+  group.objectData.labelEntity = label;
+
+  setupInteractiveEvents(group);
+
+  const objectRecord = {
+    el: group,
+    type: "sound-object",
+    id: item.id
+  };
+
+  interactiveObjects.push(objectRecord);
+  selectableObjects.push(objectRecord);
+
+  return group;
 }
 
 // ===============================
@@ -408,275 +564,51 @@ function loadLevel(levelName) {
 // ===============================
 
 function createFinishButton() {
-  const group = new THREE.Group();
+  const group = document.createElement("a-entity");
+  group.classList.add("interactive");
 
-  // 初始位置随便给一个，后面每一帧会自动跟随摄像机
-  group.position.copy(createPositionByAngle(0, -12, 4.5));
+  group.setAttribute("position", vectorToPositionString(createPositionByAngle(0, -12, 4.5)));
 
-  // 标记这是一个跟随摄像机的按钮
-  group.userData.followCamera = true;
+  group.objectData = {
+    type: "finish-button",
+    label: "完成",
+    followCamera: true,
+    baseScale: 1,
+    floatOffset: 9
+  };
 
-  const geometry = new THREE.TorusGeometry(0.32, 0.035, 16, 48);
+  const ring = document.createElement("a-entity");
+  ring.classList.add("interactive-hitbox");
+  ring.setAttribute(
+    "geometry",
+    "primitive: torus; radius: 0.32; radiusTubular: 0.035; segmentsRadial: 16; segmentsTubular: 48"
+  );
+  ring.setAttribute(
+    "material",
+    "color: #ffffff; transparent: true; opacity: 0.9; depthWrite: false"
+  );
+  ring.object3D.renderOrder = 2;
+  group.appendChild(ring);
 
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.9
-  });
+  const label = createTextLabel("完成");
+  label.setAttribute("position", "0 -0.62 0.04");
+  label.object3D.renderOrder = 4;
+  group.appendChild(label);
 
-  const ring = new THREE.Mesh(geometry, material);
+  group.objectData.mainImage = ring;
+  group.objectData.labelEntity = label;
 
-  ring.userData.type = "finish-button";
-  ring.userData.label = "完成";
-  ring.userData.parentGroup = group;
+  setupInteractiveEvents(group);
 
-  // 新增：记录完成按钮的基础大小
-  // 后面 updateObjectVisualStates 里会用它来控制选中放大
-  ring.userData.baseScale = new THREE.Vector3(1, 1, 1);
+  const objectRecord = {
+    el: group,
+    type: "finish-button",
+    id: "finish-button"
+  };
 
-  group.add(ring);
+  interactiveObjects.push(objectRecord);
+  selectableObjects.push(objectRecord);
 
-  const dashedRing = createDashedSelectionRing(0.48);
-  dashedRing.visible = false;
-  group.add(dashedRing);
-
-  const solidRing = createSolidConfirmedRing(0.48);
-  solidRing.visible = false;
-  group.add(solidRing);
-
-  const labelSprite = createTextSprite("完成");
-  labelSprite.position.set(0, -0.62, 0);
-  group.add(labelSprite);
-
-  group.userData.floatOffset = 9;
-  group.userData.mainMesh = ring;
-  group.userData.dashedRing = dashedRing;
-  group.userData.solidRing = solidRing;
-  group.userData.labelSprite = labelSprite;
-
-  interactiveObjects.push(ring);
-  selectableObjects.push(ring);
-
-  return group;
-}
-
-// ===============================
-// 清除上一关物体
-// ===============================
-
-function clearInteractiveObjects() {
-  interactiveObjects.forEach((mesh) => {
-    if (mesh.userData.parentGroup) {
-      scene.remove(mesh.userData.parentGroup);
-    }
-  });
-
-  interactiveObjects.length = 0;
-  selectableObjects.length = 0;
-
-  finishHintSprite = null;
-
-if (finishHintTimer) {
-  clearTimeout(finishHintTimer);
-  finishHintTimer = null;
-}
-}
-
-// ===============================
-// 创建漂浮意象
-// 当前先用球体占位
-// 之后可以把球体替换成图片、模型或更抽象的造型
-// ===============================
-
-// ===============================
-// 创建漂浮意象（支持预选白色滤镜 + 确认实线轮廓）
-// ===============================
-function createFloatingObject(item, index) {
-  const group = new THREE.Group();
-  group.position.copy(item.position);
-  group.userData.basePosition = item.position.clone();
-
-  const imageSize = 1.35;
-
-  const texture = new THREE.TextureLoader().load(item.imageSrc);
-  texture.colorSpace = THREE.SRGBColorSpace;
-
-  const mainMaterial = new THREE.SpriteMaterial({
-    map: texture,
-    transparent: true,
-    opacity: 0.95,
-    depthWrite: false,
-    depthTest: false
-  });
-
-  const mainMesh = new THREE.Sprite(mainMaterial);
-  mainMesh.scale.set(imageSize, imageSize, 1);
-  mainMesh.renderOrder = 1;
-
-  mainMesh.userData.baseScale = new THREE.Vector3(imageSize, imageSize, 1);
-  mainMesh.userData.type = "sound-object";
-  mainMesh.userData.soundId = item.id;
-  mainMesh.userData.label = item.label;
-  mainMesh.userData.soundName = item.soundName;
-  mainMesh.userData.audioSrc = item.audioSrc;
-  mainMesh.userData.parentGroup = group;
-
-  group.add(mainMesh);
-
-  // ============================
-  // 预选效果：白色滤镜层
-  // 调整预选明显程度主要看这里的 opacity
-  // ============================
-  const highlightMaterial = new THREE.SpriteMaterial({
-    map: texture,
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.68,
-    depthWrite: false,
-    depthTest: false,
-    blending: THREE.AdditiveBlending
-  });
-
-  const highlightSprite = new THREE.Sprite(highlightMaterial);
-  highlightSprite.scale.set(imageSize, imageSize, 1);
-  highlightSprite.renderOrder = 2;
-  highlightSprite.visible = false;
-
-  group.add(highlightSprite);
-  group.userData.highlightSprite = highlightSprite;
-
-  // ============================
-  // 确认效果：白色实线轮廓贴图
-  // 调整确认描边明显程度主要看这里的 opacity 和 outlineScale
-  // ============================
-  if (item.solidOutlineSrc) {
-    const solidTexture = new THREE.TextureLoader().load(item.solidOutlineSrc);
-    solidTexture.colorSpace = THREE.SRGBColorSpace;
-
-    const solidMaterial = new THREE.SpriteMaterial({
-      map: solidTexture,
-      transparent: true,
-      opacity: 1,
-      depthWrite: false,
-      depthTest: false,
-      blending: THREE.AdditiveBlending
-    });
-
-    const solidOutlineSprite = new THREE.Sprite(solidMaterial);
-
-    // 描边贴图可以比原图稍微大一点点，更容易看见
-    const outlineScale = 1.08;
-    solidOutlineSprite.scale.set(
-      imageSize * outlineScale,
-      imageSize * outlineScale,
-      1
-    );
-
-    solidOutlineSprite.renderOrder = 3;
-    solidOutlineSprite.visible = false;
-
-    group.add(solidOutlineSprite);
-    group.userData.solidOutlineSprite = solidOutlineSprite;
-    group.userData.solidOutlineBaseScale = new THREE.Vector3(
-      imageSize * outlineScale,
-      imageSize * outlineScale,
-      1
-    );
-  }
-
-  const labelSprite = createTextSprite(item.label);
-  labelSprite.position.set(0, -1.05, 0);
-  labelSprite.renderOrder = 4;
-  group.add(labelSprite);
-
-  group.userData.floatOffset = index * 0.8;
-  group.userData.mainMesh = mainMesh;
-  group.userData.labelSprite = labelSprite;
-  group.userData.highlightBaseScale = new THREE.Vector3(imageSize, imageSize, 1);
-
-  interactiveObjects.push(mainMesh);
-  selectableObjects.push(mainMesh);
-
-  return group;
-}
-// ===============================
-// 新增：虚线预选描边
-// ===============================
-
-function createDashedSelectionRing(radius = 0.4) {
-  const group = new THREE.Group();
-
-  const segmentCount = 28;
-  const segmentAngle = Math.PI * 2 / segmentCount;
-
-  for (let i = 0; i < segmentCount; i++) {
-    const startAngle = i * segmentAngle;
-    const endAngle = startAngle + segmentAngle * 0.48;
-
-    const curve = new THREE.EllipseCurve(
-      0,
-      0,
-      radius,
-      radius,
-      startAngle,
-      endAngle,
-      false,
-      0
-    );
-
-    const points = curve.getPoints(8);
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-
-    const material = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.95
-    });
-
-    const line = new THREE.Line(geometry, material);
-
-    // 新增：记录虚线段编号，后面做流动动画
-    line.userData.dashIndex = i;
-
-    group.add(line);
-  }
-
-  group.position.z = 0.03;
-
-  // 新增：标记这是蚂蚁线描边
-  group.userData.isMarchingDash = true;
-  group.userData.segmentCount = segmentCount;
-
-  return group;
-}
-// ===============================
-// 新增：确认后的实线发光描边
-// ===============================
-
-function createSolidConfirmedRing(radius = 0.42) {
-  const group = new THREE.Group();
-
-  const outerGeometry = new THREE.TorusGeometry(radius, 0.018, 12, 96);
-  const outerMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.95
-  });
-
-  const outerRing = new THREE.Mesh(outerGeometry, outerMaterial);
-  group.add(outerRing);
-
-  const glowGeometry = new THREE.TorusGeometry(radius, 0.055, 12, 96);
-  const glowMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.2
-  });
-
-  const glowRing = new THREE.Mesh(glowGeometry, glowMaterial);
-  group.add(glowRing);
-
-  group.position.z = 0.025;
   return group;
 }
 
@@ -684,7 +616,9 @@ function createSolidConfirmedRing(radius = 0.42) {
 // 创建文字标签
 // ===============================
 
-function createTextSprite(text) {
+function createTextLabel(text) {
+  const label = document.createElement("a-entity");
+
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
 
@@ -706,15 +640,26 @@ function createTextSprite(text) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
 
-  const material = new THREE.SpriteMaterial({
+  const material = new THREE.MeshBasicMaterial({
     map: texture,
-    transparent: true
+    transparent: true,
+    depthWrite: false,
+    depthTest: false
   });
 
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(1.45, 0.5, 1);
+  const geometry = new THREE.PlaneGeometry(1.45, 0.5);
+  const mesh = new THREE.Mesh(geometry, material);
 
-  return sprite;
+  label.setObject3D("mesh", mesh);
+
+  return label;
+}
+
+function createSmallHintText(text) {
+  const label = createTextLabel(text);
+  label.setAttribute("scale", "1.75 1 1");
+  label.setAttribute("position", "1.25 0.15 0.05");
+  return label;
 }
 
 function roundRect(context, x, y, width, height, radius) {
@@ -732,22 +677,69 @@ function roundRect(context, x, y, width, height, radius) {
 }
 
 // ===============================
-// 摇杆切换当前预选对象
+// 交互事件
+// ===============================
+
+function setupInteractiveEvents(group) {
+  const bindTargetEvents = (target) => {
+    target.addEventListener("mouseenter", () => {
+      if (!hasEnteredScene) return;
+      if (controlMode !== "gaze") return;
+
+      const index = selectableObjects.findIndex((object) => {
+        return object.el === group;
+      });
+
+      if (index >= 0) {
+        selectedIndex = index;
+        updateSelectionInfo();
+        updateObjectVisualStates();
+      }
+    });
+
+    target.addEventListener("click", () => {
+      if (!hasEnteredScene) return;
+      if (controlMode !== "gaze") return;
+
+      const index = selectableObjects.findIndex((object) => {
+        return object.el === group;
+      });
+
+      if (index >= 0) {
+        selectedIndex = index;
+        updateSelectionInfo();
+        handleAButtonClick();
+      }
+    });
+  };
+
+  // 父级也绑定一次，保险
+  bindTargetEvents(group);
+
+  // 真正被 raycaster 扫到的是这些有几何体的子元素
+  const hitboxes = group.querySelectorAll(".interactive-hitbox");
+
+  hitboxes.forEach((hitbox) => {
+    bindTargetEvents(hitbox);
+  });
+}
+
+// ===============================
+// 选择逻辑
 // ===============================
 
 function moveSelection(direction) {
   if (selectableObjects.length === 0) return;
 
   const soundObjectCount = selectableObjects.filter((object) => {
-    return object.userData.type === "sound-object";
+    return object.type === "sound-object";
   }).length;
 
   if (soundObjectCount === 0) return;
 
-  // 如果当前选中的是“完成”，左右拨动时先回到第一个或最后一个意象
   const currentObject = getSelectedObject();
 
-  if (currentObject?.userData.type === "finish-button") {
+  if (currentObject?.type === "finish-button") {
     selectedIndex = direction > 0 ? 0 : soundObjectCount - 1;
     updateSelectionInfo();
     return;
@@ -766,34 +758,37 @@ function moveSelection(direction) {
   updateSelectionInfo();
 }
 
-// ===============================
-// 更新当前选择提示
-// ===============================
+function selectFinishButton() {
+  if (selectableObjects.length === 0) return;
 
-function updateSelectionInfo() {
-  const selectedObject = getSelectedObject();
-
-  if (!selectedObject) return;
-
-  const label = selectedObject.userData.label;
-  const type = selectedObject.userData.type;
-  const soundId = selectedObject.userData.soundId;
-  const isConfirmed = soundId && confirmedSoundIds.has(soundId);
-
-  if (type === "finish-button") {
-    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前预选：完成 | 按A进入下一关`);
-    return;
-  }
-
-  if (isConfirmed) {
-    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前选择：${label} | 已确认，按A可取消`);
-  } else {
-    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前预选：${label} | 按A确认播放声音`);
-  }
+  selectedIndex = selectableObjects.length - 1;
+  updateSelectionInfo();
 }
 
 function getSelectedObject() {
   return selectableObjects[selectedIndex] || null;
+}
+
+function updateSelectionInfo() {
+  const selectedObject = getSelectedObject();
+  if (!selectedObject) return;
+
+  const data = selectedObject.el.objectData;
+  const label = data.label;
+  const type = data.type;
+  const soundId = data.id;
+  const isConfirmed = soundId && confirmedSoundIds.has(soundId);
+
+  if (type === "finish-button") {
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前预选：完成 | 确认后进入下一关`);
+    return;
+  }
+
+  if (isConfirmed) {
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前选择：${label} | 已确认，再次确认可取消`);
+  } else {
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前预选：${label} | 确认后播放声音`);
+  }
 }
 
 function hasConfirmedObjectInCurrentLevel() {
@@ -804,70 +799,8 @@ function hasConfirmedObjectInCurrentLevel() {
   });
 }
 
-function showFinishHint() {
-  const finishObject = selectableObjects[selectableObjects.length - 1];
-
-  if (!finishObject) return;
-
-  const finishGroup = finishObject.userData.parentGroup;
-
-  if (!finishGroup) return;
-
-  if (!finishHintSprite) {
-    finishHintSprite = createSmallHintSprite("请选择一个或以上的意象组成乐曲");
-    finishHintSprite.position.set(1.25, 0.15, 0);
-    finishGroup.add(finishHintSprite);
-  }
-
-  finishHintSprite.visible = true;
-
-  if (finishHintTimer) {
-    clearTimeout(finishHintTimer);
-  }
-
-  finishHintTimer = setTimeout(() => {
-    if (finishHintSprite) {
-      finishHintSprite.visible = false;
-    }
-  }, 2200);
-}
-
-function createSmallHintSprite(text) {
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-
-  canvas.width = 900;
-  canvas.height = 180;
-
-  context.clearRect(0, 0, canvas.width, canvas.height);
-
-  context.fillStyle = "rgba(0, 0, 0, 0.62)";
-  roundRect(context, 36, 42, 828, 96, 48);
-  context.fill();
-
-  context.font = "bold 38px Arial";
-  context.fillStyle = "white";
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-
-  const material = new THREE.SpriteMaterial({
-    map: texture,
-    transparent: true
-  });
-
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(2.6, 0.52, 1);
-  sprite.visible = false;
-
-  return sprite;
-}
-
 // ===============================
-// A键确认当前对象
+// 确认逻辑
 // ===============================
 
 function handleAButtonClick() {
@@ -878,16 +811,16 @@ function handleAButtonClick() {
     return;
   }
 
-  const type = selectedObject.userData.type;
+  const data = selectedObject.el.objectData;
 
-  if (type === "sound-object") {
-    toggleSoundObjectConfirm(selectedObject);
+  if (data.type === "sound-object") {
+    toggleSoundObjectConfirm(selectedObject.el);
     return;
   }
 
-  if (type === "finish-button") {
+  if (data.type === "finish-button") {
     if (!hasConfirmedObjectInCurrentLevel()) {
-      showFinishHint();
+      showFinishHint(selectedObject.el);
       updateInfo(`${levelDisplayNames[currentLevelName]} | 请至少选择一个意象后再完成`);
       return;
     }
@@ -896,39 +829,57 @@ function handleAButtonClick() {
   }
 }
 
-// ===============================
-// 确认 / 取消确认声音物体
-// ===============================
-
-function toggleSoundObjectConfirm(mesh) {
-  const soundId = mesh.userData.soundId;
+function toggleSoundObjectConfirm(entity) {
+  const data = entity.objectData;
+  const soundId = data.id;
 
   if (!soundId) return;
 
   if (confirmedSoundIds.has(soundId)) {
     confirmedSoundIds.delete(soundId);
-    stopSound(mesh);
-    updateInfo(`${levelDisplayNames[currentLevelName]} | 已取消：${mesh.userData.label}`);
+    stopSound(soundId);
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 已取消：${data.label}`);
   } else {
     confirmedSoundIds.add(soundId);
-    playSound(mesh);
+    playSound(data.audioSrc, soundId, data.soundName);
 
     if (!playedSoundRecords[currentLevelName].includes(soundId)) {
       playedSoundRecords[currentLevelName].push(soundId);
     }
 
-    updateInfo(`${levelDisplayNames[currentLevelName]} | 已确认：${mesh.userData.label} / ${mesh.userData.soundName}`);
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 已确认：${data.label} / ${data.soundName}`);
   }
+
+  updateObjectVisualStates();
+}
+
+function showFinishHint(finishEntity) {
+  if (!finishEntity) return;
+
+  if (!finishHintEl) {
+    finishHintEl = createSmallHintText("请选择一个或以上的意象组成乐曲");
+    finishEntity.appendChild(finishHintEl);
+  }
+
+  finishHintEl.setAttribute("visible", true);
+
+  if (finishHintTimer) {
+    clearTimeout(finishHintTimer);
+  }
+
+  finishHintTimer = setTimeout(() => {
+    if (finishHintEl) {
+      finishHintEl.setAttribute("visible", false);
+    }
+  }, 2200);
 }
 
 // ===============================
-// 播放声音
+// 声音逻辑：文件缺失也不影响视觉
 // ===============================
 
-function playSound(mesh) {
-  const soundId = mesh.userData.soundId;
-  const audioSrc = mesh.userData.audioSrc;
-  const soundName = mesh.userData.soundName;
+function playSound(audioSrc, soundId, soundName) {
+  if (!audioSrc) return;
 
   if (!activeAudios[soundId]) {
     const audio = new Audio(audioSrc);
@@ -940,18 +891,12 @@ function playSound(mesh) {
 
   const audio = activeAudios[soundId];
 
-  audio.play().catch((error) => {
-    console.warn("声音播放失败：", error);
-    updateInfo(`声音暂时无法播放：${soundName}。请检查音频文件路径。`);
+  audio.play().catch(() => {
+    console.warn(`声音暂时无法播放：${soundName}，请检查音频路径：${audioSrc}`);
   });
 }
 
-// ===============================
-// 停止声音
-// ===============================
-
-function stopSound(mesh) {
-  const soundId = mesh.userData.soundId;
+function stopSound(soundId) {
   const audio = activeAudios[soundId];
 
   if (!audio) return;
@@ -960,149 +905,17 @@ function stopSound(mesh) {
   audio.currentTime = 0;
 }
 
-// ===============================
-// 更新所有物体视觉状态
-// ===============================
-
-function updateObjectVisualStates() {
-  const time = performance.now() * 0.001;
-
-  selectableObjects.forEach((mesh, index) => {
-    const group = mesh.userData.parentGroup;
-    if (!group) return;
-
-    const isSelected = index === selectedIndex;
-    const isSoundObject = mesh.userData.type === "sound-object";
-    const isFinishButton = mesh.userData.type === "finish-button";
-    const soundId = mesh.userData.soundId;
-    const isConfirmed = isSoundObject && confirmedSoundIds.has(soundId);
-
-    // ===============================
-    // 完成按钮跟随摄像机
-    // ===============================
-    if (group.userData.followCamera) {
-      updateFinishButtonFollowCamera(group);
-    } else {
-      const basePosition = group.userData.basePosition;
-
-      if (basePosition) {
-        const offset = group.userData.floatOffset || 0;
-        const floatY = Math.sin(time * 1.3 + offset) * 0.08;
-
-        group.position.set(
-          basePosition.x,
-          basePosition.y + floatY,
-          basePosition.z
-        );
-      }
-
-      group.quaternion.copy(camera.quaternion);
-    }
-
-    // ===============================
-    // 缩放规则
-    // ===============================
-    const baseScale = mesh.userData.baseScale || new THREE.Vector3(1, 1, 1);
-
-    let scaleMultiplier = 1;
-
-    if (isSelected) {
-      if (isFinishButton) {
-        scaleMultiplier = 1.28;
-      } else {
-        scaleMultiplier = 1.16;
-      }
-    }
-
-    mesh.scale.copy(baseScale).multiplyScalar(scaleMultiplier);
-
-    // 预选白色滤镜显示
-    const highlightSprite = group.userData.highlightSprite;
-
-    if (highlightSprite) {
-      highlightSprite.visible = isSelected && !isConfirmed;
-
-      const highlightBaseScale =
-        group.userData.highlightBaseScale || baseScale;
-
-      highlightSprite.scale
-        .copy(highlightBaseScale)
-        .multiplyScalar(scaleMultiplier);
-    }
-
-    // 确认白色实线描边显示
-    const solidOutlineSprite = group.userData.solidOutlineSprite;
-
-    if (solidOutlineSprite) {
-      solidOutlineSprite.visible = isConfirmed;
-
-      const solidBaseScale =
-        group.userData.solidOutlineBaseScale || baseScale;
-
-      const breatheScale = isConfirmed
-        ? 1 + Math.sin(time * 2.4) * 0.025
-        : 1;
-
-      solidOutlineSprite.scale
-        .copy(solidBaseScale)
-        .multiplyScalar(scaleMultiplier * breatheScale);
-
-      solidOutlineSprite.material.opacity =
-        0.85 + Math.sin(time * 2.4) * 0.15;
-    }
-
-    // ===============================
-    // 原图透明度
-    // ===============================
-    if (isSelected) {
-      mesh.material.opacity = 1;
-    } else if (isConfirmed) {
-      mesh.material.opacity = 0.96;
-    } else {
-      mesh.material.opacity = 0.86;
-    }
+function stopAllSoundsAndClearConfirmState() {
+  Object.values(activeAudios).forEach((audio) => {
+    audio.pause();
+    audio.currentTime = 0;
   });
-}
 
-function selectFinishButton() {
-  if (selectableObjects.length === 0) return;
-
-  // 完成按钮永远是最后一个加入 selectableObjects 的对象
-  selectedIndex = selectableObjects.length - 1;
-
-  updateSelectionInfo();
-}
-
-function updateFinishButtonFollowCamera(group) {
-  if (!camera || !group) return;
-
-  const localOffset = new THREE.Vector3(0, -0.85, -3.2);
-
-  localOffset.applyQuaternion(camera.quaternion);
-
-  group.position.copy(camera.position).add(localOffset);
-
-  // 让按钮平面始终朝向玩家
-  group.quaternion.copy(camera.quaternion);
-}
-
-function updateDashedRingMarching(dashedRing, time) {
-  if (!dashedRing || !dashedRing.userData.isMarchingDash) return;
-
-  const flowIndex = Math.floor(time * 10);
-
-  dashedRing.children.forEach((segment) => {
-    const dashIndex = segment.userData.dashIndex || 0;
-
-    // 这里决定虚线的疏密和流动节奏
-    const visible = (dashIndex + flowIndex) % 3 !== 0;
-
-    segment.visible = visible;
-  });
+  confirmedSoundIds.clear();
 }
 
 // ===============================
-// 进入下一关
+// 关卡切换
 // ===============================
 
 function goToNextLevel() {
@@ -1120,164 +933,91 @@ function goToNextLevel() {
   }
 }
 
-// ===============================
-// 切换关卡时停止所有声音，并清空确认状态
-// 每一关不可返回，所以这里清空是合理的
-// 但 playedSoundRecords 会保留每关选择记录
-// ===============================
-
-function stopAllSoundsAndClearConfirmState() {
-  Object.values(activeAudios).forEach((audio) => {
-    audio.pause();
-    audio.currentTime = 0;
-  });
-
-  confirmedSoundIds.clear();
-}
-
-// ===============================
-// 带白雾过渡的关卡切换
-// ===============================
-
 function transitionToLevel(levelName) {
   isLevelTransitioning = true;
 
-  if (fogOverlay) {
-    fogOverlay.style.transition = "opacity 0.45s ease";
-    fogOverlay.style.opacity = "1";
-  }
+  const fogOverlay = document.querySelector("#fog-overlay");
+
+  fogOverlay.style.transition = "opacity 0.45s ease";
+  fogOverlay.style.opacity = "1";
 
   setTimeout(() => {
-    scene.background = panoramas[levelName];
-
+    setPanorama(levelName);
     loadLevel(levelName);
 
-    targetFov = 75;
-    camera.fov = targetFov;
-    camera.updateProjectionMatrix();
-
-    if (fogOverlay) {
-      fogOverlay.style.opacity = "0";
-    }
+    fogOverlay.style.opacity = "0";
 
     setTimeout(() => {
       isLevelTransitioning = false;
-
-      if (fogOverlay) {
-        fogOverlay.style.transition = "";
-      }
-
-      updateFogByFov();
+      fogOverlay.style.transition = "";
     }, 500);
   }, 450);
 }
 
-// ===============================
-// 最后结束状态
-// ===============================
-
 function showEndingState() {
   clearInteractiveObjects();
 
-  updateInfo(
-    "三首声音已经完成。之后可以在这里制作总结页面，回放三关的声音作品。"
-  );
+  updateInfo("三首声音已经完成。之后可以在这里制作总结页面，回放三关的声音作品。");
 
-  if (fogOverlay) {
-    fogOverlay.style.transition = "opacity 0.8s ease";
-    fogOverlay.style.opacity = "0.18";
-  }
+  const fogOverlay = document.querySelector("#fog-overlay");
+  fogOverlay.style.transition = "opacity 0.8s ease";
+  fogOverlay.style.opacity = "0.18";
 
   console.log("每关记录的声音：", playedSoundRecords);
-}
-
-// ===============================
-// 键盘测试
-// ===============================
-
-function handleKeyboardTest(event) {
-  if (event.code === "ArrowRight") {
-    moveSelection(1);
-  }
-
-  if (event.code === "ArrowLeft") {
-    moveSelection(-1);
-  }
-
-  // 新增：键盘向下也必选中完成按钮
-  if (event.code === "ArrowDown") {
-    selectFinishButton();
-  }
-
-  if (event.code === "Space" || event.code === "Enter") {
-    handleAButtonClick();
-  }
-}
-
-// ===============================
-// 双眼相机
-// ===============================
-
-function setupStereoCameras() {
-  leftCamera = camera.clone();
-  rightCamera = camera.clone();
-
-  leftCamera.aspect = window.innerWidth / 2 / window.innerHeight;
-  rightCamera.aspect = window.innerWidth / 2 / window.innerHeight;
-
-  leftCamera.updateProjectionMatrix();
-  rightCamera.updateProjectionMatrix();
 }
 
 // ===============================
 // 手柄
 // ===============================
 
-function setupGamepadTest() {
-  window.addEventListener("gamepadconnected", function (event) {
+function setupGamepadEvents() {
+  window.addEventListener("gamepadconnected", (event) => {
     gamepadIndex = event.gamepad.index;
 
-    console.log("手柄已连接：", event.gamepad);
+    if (!hasEnteredScene) {
+      controlMode = "gamepad";
+    }
 
-    updateInfo(
-      `手柄已连接：${event.gamepad.id} / 左摇杆切换 / A确认 / LT放大 / RT缩小`
-    );
+    console.log("手柄已连接：", event.gamepad);
   });
 
-  window.addEventListener("gamepaddisconnected", function () {
+  window.addEventListener("gamepaddisconnected", () => {
     gamepadIndex = null;
-    updateInfo("手柄已断开");
+
+    if (hasEnteredScene && controlMode === "gamepad") {
+      updateInfo("手柄已断开，请刷新后使用眼神控制模式");
+    }
   });
 }
 
+function findConnectedGamepad() {
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+
+  for (const gamepad of gamepads) {
+    if (gamepad) return gamepad;
+  }
+
+  return null;
+}
+
 function checkGamepadInput() {
-  if (gamepadIndex === null) return;
-
-  const gamepads = navigator.getGamepads();
-  const gamepad = gamepads[gamepadIndex];
-
+  const gamepad = getActiveGamepad();
   if (!gamepad) return;
 
-  const pressedButtons = [];
-
-  gamepad.buttons.forEach((button, index) => {
-    if (button.pressed) {
-      pressedButtons.push(index);
-    }
-  });
-
   const aButtonPressed = gamepad.buttons[0]?.pressed || false;
-  const ltValue = gamepad.buttons[6]?.value || 0;
-  const rtValue = gamepad.buttons[7]?.value || 0;
-
   const leftStickX = gamepad.axes[0] || 0;
   const leftStickY = gamepad.axes[1] || 0;
 
-  const now = performance.now();
+  if (!hasEnteredScene) {
+    if (aButtonPressed && !previousAButtonPressed && controlMode === "gamepad") {
+      enterScene();
+    }
 
-  // ===============================
-  // 新增：左摇杆向下，必选中完成按钮
-  // ===============================
+    previousAButtonPressed = aButtonPressed;
+    return;
+  }
+
+  if (controlMode !== "gamepad") return;
 
   const downStickPressed = leftStickY > 0.65;
 
@@ -1287,11 +1027,6 @@ function checkGamepadInput() {
 
   previousDownStickPressed = downStickPressed;
 
-  // ===============================
-  // 左摇杆左右切换选项
-  // 即使现在选中的是完成按钮，左右拨动也可以回到物体
-  // ===============================
-
   let currentStickDirection = 0;
 
   if (leftStickX > 0.55) {
@@ -1299,6 +1034,8 @@ function checkGamepadInput() {
   } else if (leftStickX < -0.55) {
     currentStickDirection = -1;
   }
+
+  const now = performance.now();
 
   if (
     currentStickDirection !== 0 &&
@@ -1313,40 +1050,6 @@ function checkGamepadInput() {
 
   previousStickDirection = currentStickDirection;
 
-  // ===============================
-  // LT / RT 控制放大缩小
-  // LT 放大：FOV变小
-  // RT 缩小：FOV变大
-  // ===============================
-
-  if (ltValue > deadZone) {
-    targetFov -= ltValue * zoomSpeed;
-  }
-
-  if (rtValue > deadZone) {
-    targetFov += rtValue * zoomSpeed;
-  }
-
-  targetFov = THREE.MathUtils.clamp(
-    targetFov,
-    minFov,
-    maxFov
-  );
-
-  camera.fov = THREE.MathUtils.lerp(
-    camera.fov,
-    targetFov,
-    0.08
-  );
-
-  camera.updateProjectionMatrix();
-  updateFogByFov();
-
-  // ===============================
-  // A键确认
-  // 只在刚按下时触发一次
-  // ===============================
-
   if (aButtonPressed && !previousAButtonPressed) {
     handleAButtonClick();
   }
@@ -1354,299 +1057,165 @@ function checkGamepadInput() {
   previousAButtonPressed = aButtonPressed;
 }
 
-// ===============================
-// 雾气效果
-// ===============================
+function getActiveGamepad() {
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
 
-function updateFogByFov() {
-  if (!fogOverlay) return;
-  if (isLevelTransitioning) return;
-
-  let fogOpacity = 0;
-  let blurAmount = 0;
-
-  if (camera.fov < 65) {
-    fogOpacity = THREE.MathUtils.mapLinear(
-      camera.fov,
-      65,
-      35,
-      0,
-      0.45
-    );
-
-    blurAmount = THREE.MathUtils.mapLinear(
-      camera.fov,
-      65,
-      35,
-      0,
-      12
-    );
+  if (gamepadIndex !== null && gamepads[gamepadIndex]) {
+    return gamepads[gamepadIndex];
   }
 
-  fogOpacity = THREE.MathUtils.clamp(
-    fogOpacity,
-    0,
-    0.45
-  );
-
-  blurAmount = THREE.MathUtils.clamp(
-    blurAmount,
-    0,
-    12
-  );
-
-  fogOverlay.style.opacity = fogOpacity.toFixed(3);
-  fogOverlay.style.backdropFilter = `blur(${blurAmount}px)`;
+  return findConnectedGamepad();
 }
 
 // ===============================
-// 手机陀螺仪
+// 键盘
 // ===============================
 
-function setupDeviceOrientation() {
-  const orientationButton = document.querySelector("#orientation-btn");
-
-  if (!orientationButton) return;
-
-  orientationButton.addEventListener("click", async () => {
-    if (
-      typeof DeviceOrientationEvent !== "undefined" &&
-      typeof DeviceOrientationEvent.requestPermission === "function"
-    ) {
-      try {
-        const permission = await DeviceOrientationEvent.requestPermission();
-
-        if (permission !== "granted") {
-          updateInfo("陀螺仪权限未开启");
-          return;
-        }
-      } catch (error) {
-        console.error("陀螺仪权限申请失败：", error);
-        updateInfo("陀螺仪权限申请失败");
-        return;
-      }
+function setupKeyboardInput() {
+  window.addEventListener("keydown", (event) => {
+    // 教学页：按 Enter 进入场景
+    if (event.code === "Enter" && !hasEnteredScene) {
+      enterScene();
+      return;
     }
 
-    window.addEventListener(
-      "deviceorientation",
-      function (event) {
-        latestDeviceOrientation = event;
-      },
-      true
-    );
+    if (!hasEnteredScene) return;
 
-    useDeviceOrientation = true;
-
-    if (controls) {
-      controls.enabled = false;
+    // 电脑测试通用键盘控制：
+    // 不管现在是 gaze 模式还是 gamepad 模式，都允许键盘辅助测试
+    if (event.code === "ArrowRight") {
+      moveSelection(1);
+      updateObjectVisualStates();
+      return;
     }
 
-    orientationButton.classList.add("hidden");
+    if (event.code === "ArrowLeft") {
+      moveSelection(-1);
+      updateObjectVisualStates();
+      return;
+    }
 
-    updateInfo("手机陀螺仪已开启：请横屏放入 VR 盒子");
+    if (event.code === "ArrowDown") {
+      selectFinishButton();
+      updateObjectVisualStates();
+      return;
+    }
+
+    if (event.code === "Space" || event.code === "Enter") {
+      handleAButtonClick();
+      updateObjectVisualStates();
+      return;
+    }
   });
 }
 
-function updateCameraByDeviceOrientation() {
-  if (!latestDeviceOrientation) return;
+// ===============================
+// 每帧视觉更新
+// ===============================
 
-  const alpha = THREE.MathUtils.degToRad(
-    latestDeviceOrientation.alpha || 0
-  );
+function updateLoop() {
+  checkGamepadInput();
 
-  const beta = THREE.MathUtils.degToRad(
-    latestDeviceOrientation.beta || 0
-  );
+  if (hasEnteredScene) {
+    updateObjectVisualStates();
+  }
 
-  const gamma = THREE.MathUtils.degToRad(
-    latestDeviceOrientation.gamma || 0
-  );
+  requestAnimationFrame(updateLoop);
+}
 
-  const orient = THREE.MathUtils.degToRad(
-    window.orientation || 0
-  );
+function updateObjectVisualStates() {
+  if (!cameraObject) return;
 
-  setObjectQuaternion(
-    camera.quaternion,
-    alpha,
-    beta,
-    gamma,
-    orient
-  );
+  const time = performance.now() * 0.001;
+  const cameraWorldPosition = new THREE.Vector3();
+
+  cameraObject.getWorldPosition(cameraWorldPosition);
+
+  selectableObjects.forEach((objectRecord, index) => {
+    const entity = objectRecord.el;
+    const data = entity.objectData;
+
+    if (!data) return;
+
+    const isSelected = index === selectedIndex;
+    const isConfirmed = data.id && confirmedSoundIds.has(data.id);
+    const isFinishButton = data.type === "finish-button";
+
+    if (data.followCamera) {
+      updateFinishButtonFollowCamera(entity);
+    } else {
+      const basePosition = data.basePosition;
+
+      if (basePosition) {
+        const offset = data.floatOffset || 0;
+        const floatY = Math.sin(time * 1.3 + offset) * 0.08;
+
+        entity.object3D.position.set(
+          basePosition.x,
+          basePosition.y + floatY,
+          basePosition.z
+        );
+      }
+
+      entity.object3D.lookAt(cameraWorldPosition);
+    }
+
+    let scaleMultiplier = 1;
+
+    if (isSelected) {
+      scaleMultiplier = isFinishButton ? 1.28 : PRESELECT_SCALE;
+    }
+
+    entity.object3D.scale.set(scaleMultiplier, scaleMultiplier, scaleMultiplier);
+
+    if (data.highlightImage) {
+      data.highlightImage.setAttribute("visible", isSelected && !isConfirmed);
+    }
+
+    if (data.solidOutlineImage) {
+      data.solidOutlineImage.setAttribute("visible", isConfirmed);
+
+      const breatheScale = isConfirmed
+        ? 1 + Math.sin(time * 2.4) * 0.025
+        : 1;
+
+      data.solidOutlineImage.object3D.scale.set(
+        breatheScale,
+        breatheScale,
+        breatheScale
+      );
+    }
+
+    if (data.mainImage && data.mainImage.getAttribute("material")) {
+      if (isSelected) {
+        data.mainImage.setAttribute("material", "opacity", 1);
+      } else if (isConfirmed) {
+        data.mainImage.setAttribute("material", "opacity", 0.96);
+      } else {
+        data.mainImage.setAttribute("material", "opacity", 0.86);
+      }
+    }
+  });
+}
+
+function updateFinishButtonFollowCamera(entity) {
+  if (!cameraObject) return;
+
+  const localOffset = new THREE.Vector3(0, -0.85, -3.2);
+  const cameraWorldPosition = new THREE.Vector3();
+  const cameraQuaternion = new THREE.Quaternion();
+
+  cameraObject.getWorldPosition(cameraWorldPosition);
+  cameraObject.getWorldQuaternion(cameraQuaternion);
+
+  localOffset.applyQuaternion(cameraQuaternion);
+
+  entity.object3D.position.copy(cameraWorldPosition).add(localOffset);
+  entity.object3D.quaternion.copy(cameraQuaternion);
 }
 
 // ===============================
-// 手机陀螺仪方向换算
-// ===============================
-
-const zee = new THREE.Vector3(0, 0, 1);
-const euler = new THREE.Euler();
-const q0 = new THREE.Quaternion();
-const q1 = new THREE.Quaternion(
-  -Math.sqrt(0.5),
-  0,
-  0,
-  Math.sqrt(0.5)
-);
-
-function setObjectQuaternion(
-  quaternion,
-  alpha,
-  beta,
-  gamma,
-  orient
-) {
-  euler.set(
-    beta,
-    alpha,
-    -gamma,
-    "YXZ"
-  );
-
-  quaternion.setFromEuler(euler);
-  quaternion.multiply(q1);
-  quaternion.multiply(
-    q0.setFromAxisAngle(zee, -orient)
-  );
-}
-
-// ===============================
-// 移动端双眼渲染
-// ===============================
-
-function updateStereoCameras() {
-  leftCamera.position.copy(camera.position);
-  rightCamera.position.copy(camera.position);
-
-  leftCamera.quaternion.copy(camera.quaternion);
-  rightCamera.quaternion.copy(camera.quaternion);
-
-  leftCamera.fov = camera.fov;
-  rightCamera.fov = camera.fov;
-
-  const eyeWidth = window.innerWidth * mobileEyeScale / 2;
-  const eyeHeight = window.innerHeight * mobileEyeScale;
-
-  leftCamera.aspect = eyeWidth / eyeHeight;
-  rightCamera.aspect = eyeWidth / eyeHeight;
-
-  const eyeDirection = new THREE.Vector3(1, 0, 0);
-  eyeDirection.applyQuaternion(camera.quaternion);
-
-  leftCamera.position.addScaledVector(eyeDirection, -eyeOffset);
-  rightCamera.position.addScaledVector(eyeDirection, eyeOffset);
-
-  leftCamera.updateProjectionMatrix();
-  rightCamera.updateProjectionMatrix();
-}
-
-function renderPCMode() {
-  renderer.setScissorTest(false);
-  renderer.setViewport(
-    0,
-    0,
-    window.innerWidth,
-    window.innerHeight
-  );
-
-  renderer.clear();
-  renderer.render(scene, camera);
-}
-
-function renderMobileMode() {
-  updateStereoCameras();
-
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-
-  const eyeWidth = width * mobileEyeScale / 2;
-  const eyeHeight = height * mobileEyeScale;
-
-  const totalEyeWidth = eyeWidth * 2 + mobileEyeGap;
-
-  const startX = (width - totalEyeWidth) / 2;
-  const eyeY = (height - eyeHeight) / 2;
-
-  const leftX = startX;
-  const rightX = startX + eyeWidth + mobileEyeGap;
-
-  renderer.setClearColor(0x000000, 1);
-  renderer.clear();
-
-  renderer.setScissorTest(true);
-
-  renderer.setViewport(
-    leftX,
-    eyeY,
-    eyeWidth,
-    eyeHeight
-  );
-
-  renderer.setScissor(
-    leftX,
-    eyeY,
-    eyeWidth,
-    eyeHeight
-  );
-
-  renderer.render(scene, leftCamera);
-
-  renderer.setViewport(
-    rightX,
-    eyeY,
-    eyeWidth,
-    eyeHeight
-  );
-
-  renderer.setScissor(
-    rightX,
-    eyeY,
-    eyeWidth,
-    eyeHeight
-  );
-
-  renderer.render(scene, rightCamera);
-
-  renderer.setScissorTest(false);
-  updateMobileFrameOverlay();
-}
-
-function updateMobileFrameOverlay() {
-  const overlay = document.querySelector("#vr-frame-overlay");
-  const leftFrame = document.querySelector(".left-eye-frame");
-  const rightFrame = document.querySelector(".right-eye-frame");
-
-  if (!overlay || !leftFrame || !rightFrame) return;
-
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-
-  const eyeWidth = width * mobileEyeScale / 2;
-  const eyeHeight = height * mobileEyeScale;
-
-  const totalEyeWidth = eyeWidth * 2 + mobileEyeGap;
-
-  const startX = (width - totalEyeWidth) / 2;
-  const eyeY = (height - eyeHeight) / 2;
-
-  const leftX = startX;
-  const rightX = startX + eyeWidth + mobileEyeGap;
-
-  leftFrame.style.left = `${leftX}px`;
-  leftFrame.style.top = `${eyeY}px`;
-  leftFrame.style.width = `${eyeWidth}px`;
-  leftFrame.style.height = `${eyeHeight}px`;
-  leftFrame.style.borderRadius = "0px";
-
-  rightFrame.style.left = `${rightX}px`;
-  rightFrame.style.top = `${eyeY}px`;
-  rightFrame.style.width = `${eyeWidth}px`;
-  rightFrame.style.height = `${eyeHeight}px`;
-  rightFrame.style.borderRadius = "0px";
-}
-
-// ===============================
-// UI提示
+// UI
 // ===============================
 
 function updateInfo(text) {
@@ -1655,52 +1224,4 @@ function updateInfo(text) {
   if (infoText) {
     infoText.textContent = text;
   }
-}
-
-// ===============================
-// 窗口尺寸变化
-// ===============================
-
-function onWindowResize() {
-  if (!camera || !renderer) return;
-
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-
-  renderer.setSize(
-    window.innerWidth,
-    window.innerHeight
-  );
-
-  if (leftCamera && rightCamera) {
-    leftCamera.aspect = window.innerWidth / 2 / window.innerHeight;
-    rightCamera.aspect = window.innerWidth / 2 / window.innerHeight;
-
-    leftCamera.updateProjectionMatrix();
-    rightCamera.updateProjectionMatrix();
-  }
-}
-
-// ===============================
-// 动画循环
-// ===============================
-
-function animate() {
-  renderer.setAnimationLoop(() => {
-    checkGamepadInput();
-
-    if (useDeviceOrientation) {
-      updateCameraByDeviceOrientation();
-    } else {
-      controls.update();
-    }
-
-    updateObjectVisualStates();
-
-    if (playMode === "mobile") {
-      renderMobileMode();
-    } else {
-      renderPCMode();
-    }
-  });
 }

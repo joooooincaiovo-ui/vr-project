@@ -6,22 +6,17 @@
 
   <title>VR Project</title>
 
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
-    }
-  }
-  </script>
+  <!-- A-Frame：使用你测试过可运行的版本 -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
   <link rel="stylesheet" href="./style.css" />
 </head>
 
 <body>
-  <!-- 加载界面 -->
+  <!-- 加载 / 教学缓冲界面 -->
   <div id="start-screen">
-    <div id="loading-panel">
+    <!-- 加载进度条 -->
+    <div id="loading-panel" class="start-panel">
       <h1>VR Project</h1>
 
       <div id="loading-bar-bg">
@@ -31,12 +26,58 @@
       <p id="loading-text">Loading 0%</p>
     </div>
 
-    <div id="mode-panel" class="hidden">
-      <h1>选择游玩方式</h1>
-      <p>请选择适合当前设备的显示模式</p>
+    <!-- 检测控制方式 -->
+    <div id="detect-panel" class="start-panel hidden">
+      <h1>检测控制方式</h1>
+      <p id="detect-text">正在检测手柄连接，请稍候...</p>
 
-      <button id="mobile-mode-btn">使用移动端游玩</button>
-      <button id="pc-mode-btn">使用 PC 端游玩</button>
+      <div class="detect-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <!-- 手柄教学页 -->
+    <div id="controller-guide-panel" class="start-panel guide-panel hidden">
+      <h1>手柄模式</h1>
+
+      <img
+        id="controller-guide-image"
+        class="guide-image"
+        src="./assets/ui/controller-guide.png"
+        alt="手柄操作教学图"
+      />
+
+      <div class="guide-fallback">
+        <p>左摇杆左右：切换意象</p>
+        <p>左摇杆向下：选择完成</p>
+        <p>A 键：确认 / 取消 / 完成</p>
+      </div>
+
+      <button id="enter-controller-btn" class="enter-btn">进入场景</button>
+      <p class="enter-tip">也可以按 Enter 或手柄 A 键进入</p>
+    </div>
+
+    <!-- 眼神 + 点击教学页 -->
+    <div id="gaze-guide-panel" class="start-panel guide-panel hidden">
+      <h1>眼神控制模式</h1>
+
+      <img
+        id="gaze-guide-image"
+        class="guide-image"
+        src="./assets/ui/gaze-guide.png"
+        alt="眼神控制教学图"
+      />
+
+      <div class="guide-fallback">
+        <p>视线扫到意象：预选</p>
+        <p>看着意象并点击屏幕：确认 / 取消</p>
+        <p>看着完成按钮并点击：进入下一关</p>
+      </div>
+
+      <button id="enter-gaze-btn" class="enter-btn">进入场景</button>
+      <p class="enter-tip">也可以按 Enter 进入</p>
     </div>
   </div>
 
@@ -49,14 +90,41 @@
   <!-- 白雾遮罩 -->
   <div id="fog-overlay"></div>
 
-  <div id="vr-frame-overlay" class="hidden">
-  <div class="eye-frame left-eye-frame"></div>
-  <div class="eye-frame right-eye-frame"></div>
-</div>
+  <!-- A-Frame 场景 -->
+  <a-scene
+    id="vr-scene"
+    class="hidden"
+    vr-mode-ui="enabled: true"
+    embedded
+    renderer="antialias: true; alpha: false"
+  >
+    <a-assets></a-assets>
 
-  <!-- 手机陀螺仪按钮 -->
-  <button id="orientation-btn" class="hidden">开启手机陀螺仪</button>
+    <!-- 玩家摄像机 -->
+    <a-entity id="camera-rig" position="0 0 0">
+      <a-camera
+        id="main-camera"
+        position="0 0 0"
+        look-controls="enabled: true"
+        wasd-controls="enabled: false"
+      >
+        <!-- 非手柄模式用：中心视线光标 -->
+        <a-cursor
+  id="gaze-cursor"
+  class="hidden"
+  fuse="false"
+  raycaster="objects: .interactive-hitbox"
+  material="color: white; opacity: 0.85; transparent: true"
+  geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.014"
+  position="0 0 -1"
+></a-cursor>
+      </a-camera>
+    </a-entity>
 
-  <script type="module" src="./script.js"></script>
+    <!-- 动态生成的关卡物体会放进这里 -->
+    <a-entity id="level-root"></a-entity>
+  </a-scene>
+
+  <script src="./script.js"></script>
 </body>
 </html>

@@ -13,16 +13,12 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-canvas {
-  display: block;
-}
-
 .hidden {
   display: none !important;
 }
 
 /* ===============================
-   开场加载界面
+   开场加载 / 教学界面
 ================================ */
 
 #start-screen {
@@ -40,16 +36,20 @@ canvas {
   text-align: center;
 }
 
-#loading-panel,
-#mode-panel {
-  width: min(420px, 82vw);
+.start-panel {
+  width: min(560px, 86vw);
 }
 
-#loading-panel h1,
-#mode-panel h1 {
+.start-panel h1 {
   font-size: 32px;
   letter-spacing: 3px;
   margin-bottom: 28px;
+}
+
+.start-panel p {
+  font-size: 15px;
+  line-height: 1.8;
+  opacity: 0.82;
 }
 
 #loading-bar-bg {
@@ -77,23 +77,82 @@ canvas {
   opacity: 0.75;
 }
 
-#mode-panel p {
-  margin-bottom: 28px;
-  font-size: 14px;
-  opacity: 0.75;
+.detect-dots {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
 }
 
-#mode-panel button {
+.detect-dots span {
+  width: 8px;
+  height: 8px;
+
+  background: white;
+  border-radius: 50%;
+
+  opacity: 0.25;
+  animation: dotPulse 1.2s infinite ease-in-out;
+}
+
+.detect-dots span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.detect-dots span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+}
+
+.guide-panel {
+  width: min(680px, 88vw);
+}
+
+.guide-image {
   display: block;
 
   width: 100%;
-  padding: 14px 20px;
-  margin-bottom: 16px;
+  max-height: 46vh;
+  object-fit: contain;
 
-  border: 1px solid rgba(255, 255, 255, 0.75);
+  margin: 0 auto 22px;
+
+  border-radius: 18px;
+}
+
+.guide-image[src=""],
+.guide-image:not([src]) {
+  display: none;
+}
+
+.guide-fallback {
+  margin: 0 auto 24px;
+  padding: 18px 20px;
+
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 18px;
+
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.enter-btn {
+  padding: 12px 32px;
+
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 999px;
 
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   color: white;
 
   font-size: 16px;
@@ -102,8 +161,14 @@ canvas {
   cursor: pointer;
 }
 
-#mode-panel button:hover {
-  background: rgba(255, 255, 255, 0.18);
+.enter-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.enter-tip {
+  margin-top: 14px;
+  font-size: 13px !important;
+  opacity: 0.56 !important;
 }
 
 /* ===============================
@@ -151,53 +216,17 @@ canvas {
 }
 
 /* ===============================
-   手机陀螺仪按钮
+   A-Frame 场景
 ================================ */
 
-#orientation-btn {
-  position: fixed;
-  left: 50%;
-  bottom: 32px;
-  transform: translateX(-50%);
-
-  z-index: 20;
-
-  padding: 12px 22px;
-
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 999px;
-
-  background: rgba(0, 0, 0, 0.45);
-  color: white;
-
-  font-size: 14px;
-  letter-spacing: 1px;
-
-  backdrop-filter: blur(8px);
-}
-
-#vr-frame-overlay {
+#vr-scene {
   position: fixed;
   inset: 0;
-  z-index: 8;
-  pointer-events: none;
+  width: 100%;
+  height: 100%;
 }
 
-.eye-frame {
-  position: absolute;
-
-  pointer-events: none;
-
-  /*
-    这一层是“镜片遮罩”
-    中心透明，越靠边越黑，四个角完全黑掉
-  */
-  background: radial-gradient(
-    ellipse at center,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0) 60%,
-    rgba(0, 0, 0, 0.28) 68%,
-    rgba(0, 0, 0, 0.72) 82%,
-    rgba(0, 0, 0, 1) 100%
-  );
+/* A-Frame 默认 VR 按钮会在右下角出现 */
+.a-enter-vr {
+  z-index: 30 !important;
 }
