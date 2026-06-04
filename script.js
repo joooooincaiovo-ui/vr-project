@@ -80,7 +80,7 @@ const levelDisplayNames = {
 const IMAGE_SIZE = 1.35;
 
 // 预选白色滤镜强度：越大越白，建议 0.55 - 0.9
-const PRESELECT_WHITE_OPACITY = 0.72;
+//const PRESELECT_WHITE_OPACITY = 0;
 
 // 预选放大程度：越大越明显，建议 1.08 - 1.25
 const PRESELECT_SCALE = 1.16;
@@ -639,7 +639,7 @@ function loadPanoramas() {
   loader.setPath("./assets/images/");
 
   panoramas = {
-    floor1: loader.load([
+    floor1: createStableCubeTexture(loader, [
       "px.png",
       "nx.png",
       "py.png",
@@ -648,7 +648,7 @@ function loadPanoramas() {
       "nz.png"
     ]),
 
-    floor2: loader.load([
+    floor2: createStableCubeTexture(loader, [
       "2-4.png",
       "2-1.png",
       "2-5.png",
@@ -657,7 +657,7 @@ function loadPanoramas() {
       "2-3.png"
     ]),
 
-    floor3: loader.load([
+    floor3: createStableCubeTexture(loader, [
       "3-4.png",
       "3-1.png",
       "3-5.png",
@@ -666,6 +666,29 @@ function loadPanoramas() {
       "3-3.png"
     ])
   };
+}
+
+function createStableCubeTexture(loader, files) {
+  const texture = loader.load(files);
+
+  // 手机端 VR 模式下，CubeTexture 的边缘采样容易出现白色锯齿/接缝
+  // 这里关闭 mipmap，并强制使用边缘夹取，减少六面图边缘被错误采样
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+
+  // A-Frame 1.5 / Three r158 使用 colorSpace
+  if ("colorSpace" in texture) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+  } else {
+    texture.encoding = THREE.sRGBEncoding;
+  }
+
+  texture.needsUpdate = true;
+
+  return texture;
 }
 
 function setPanorama(levelName) {
