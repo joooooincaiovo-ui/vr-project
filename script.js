@@ -334,7 +334,10 @@ function createFloatingObject(item, index) {
   highlightImage.setAttribute("src", `#${item.id}-img`);
   highlightImage.setAttribute("width", IMAGE_SIZE);
   highlightImage.setAttribute("height", IMAGE_SIZE);
-  highlightImage.setAttribute("material", `transparent:true; opacity:${PRESELECT_WHITE_OPACITY}; color:#ffffff; blending:additive; depthWrite:false; depthTest:false`);
+  highlightImage.setAttribute(
+  "material",
+  `transparent:true; opacity:${PRESELECT_WHITE_OPACITY}; color:#ffffff; alphaTest:0.08; depthWrite:false; depthTest:true`
+);
   highlightImage.setAttribute("visible", false);
   highlightImage.setAttribute("position", "0 0 0.015");
   group.appendChild(highlightImage);
@@ -346,7 +349,10 @@ function createFloatingObject(item, index) {
     solidOutline.setAttribute("src", `#${item.id}-outline`);
     solidOutline.setAttribute("width", IMAGE_SIZE * OUTLINE_SCALE);
     solidOutline.setAttribute("height", IMAGE_SIZE * OUTLINE_SCALE);
-    solidOutline.setAttribute("material", "transparent:true; opacity:1; blending:additive; depthWrite:false; depthTest:false");
+    solidOutline.setAttribute(
+  "material",
+  "transparent:true; opacity:1; alphaTest:0.08; depthWrite:false; depthTest:true"
+);
     solidOutline.setAttribute("visible", false);
     solidOutline.setAttribute("position", "0 0 0.03");
     group.appendChild(solidOutline);

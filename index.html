@@ -92,12 +92,12 @@
 
   <!-- A-Frame 场景 -->
   <a-scene
-    id="vr-scene"
-    class="hidden"
-    vr-mode-ui="enabled: true"
-    embedded
-    renderer="antialias: true; alpha: false"
-  >
+  id="vr-scene"
+  class="hidden"
+  vr-mode-ui="enabled: true"
+  embedded
+  renderer="antialias: false; alpha: false; precision: mediump; logarithmicDepthBuffer: false"
+>
     <a-assets></a-assets>
 
     <!-- 玩家摄像机 -->
