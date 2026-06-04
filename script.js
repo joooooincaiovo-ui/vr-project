@@ -236,6 +236,8 @@ window.addEventListener("DOMContentLoaded", () => {
   levelRoot = document.querySelector("#level-root");
   cameraEl = document.querySelector("#main-camera");
 
+  preloadAssets();
+
   sceneEl.addEventListener("loaded", () => {
     cameraObject = cameraEl.object3D;
     loadPanoramas();
@@ -250,80 +252,114 @@ window.addEventListener("DOMContentLoaded", () => {
   requestAnimationFrame(updateLoop);
 });
 
+const vrToggleBtn = document.createElement("button");
+vrToggleBtn.id = "vr-toggle-btn";
+vrToggleBtn.innerText = "VR / 3D";
+Object.assign(vrToggleBtn.style, {
+  position: "fixed",
+  bottom: "16px",
+  right: "16px",
+  zIndex: "50",
+  padding: "10px 16px",
+  borderRadius: "12px",
+  background: "rgba(255,255,255,0.85)",
+  color: "black",
+  fontWeight: "bold",
+  border: "none"
+});
+document.body.appendChild(vrToggleBtn);
+
+vrToggleBtn.addEventListener("click", () => {
+  if (!sceneEl.is("vr-mode")) sceneEl.enterVR();
+  else sceneEl.exitVR();
+});
+
+
 // ===============================
-// 加载流程
+// 教学页点击进入场景
 // ===============================
 
-function initLoadingFlow() {
-  const loadingPanel = document.querySelector("#loading-panel");
-  const detectPanel = document.querySelector("#detect-panel");
-  const loadingBar = document.querySelector("#loading-bar");
-  const loadingText = document.querySelector("#loading-text");
+// ===============================
+// 浮动意象创建
+// ===============================
+function createFloatingObject(item, index) {
+  const group = document.createElement("a-entity");
+  group.classList.add("interactive");
 
-  let progress = 0;
-  const totalTime = 5000;
-  const intervalTime = 50;
-  const step = 100 / (totalTime / intervalTime);
+  group.setAttribute("position", vectorToPositionString(item.position));
+  group.objectData = {
+  type: "sound-object",
+  item,
+  id: item.id,
+  label: item.label,
+  soundName: item.soundName,
+  audioSrc: item.audioSrc,
+  basePosition: item.position.clone(),
+  floatOffset: index * 0.8,
+  baseScale: 1,
+  confirmed: false
+};
 
-  const timer = setInterval(() => {
-    progress += step;
+  // 主图
+  const mainImage = document.createElement("a-image");
+  mainImage.setAttribute("src", `#${item.id}-img`);
+  mainImage.setAttribute("width", IMAGE_SIZE);
+  mainImage.setAttribute("height", IMAGE_SIZE);
+  mainImage.classList.add("interactive-hitbox");
+  group.appendChild(mainImage);
 
-    if (progress >= 100) {
-      progress = 100;
-      clearInterval(timer);
+  // 预选白色滤镜
+  const highlightImage = document.createElement("a-image");
+  highlightImage.setAttribute("src", `#${item.id}-img`);
+  highlightImage.setAttribute("width", IMAGE_SIZE);
+  highlightImage.setAttribute("height", IMAGE_SIZE);
+  highlightImage.setAttribute("material", `transparent:true; opacity:${PRESELECT_WHITE_OPACITY}; color:#ffffff; blending:additive; depthWrite:false; depthTest:false`);
+  highlightImage.setAttribute("visible", false);
+  highlightImage.setAttribute("position", "0 0 0.015");
+  group.appendChild(highlightImage);
+  group.objectData.highlightImage = highlightImage;
 
-      setTimeout(() => {
-        loadingPanel.classList.add("hidden");
-        detectPanel.classList.remove("hidden");
-        startControllerDetection();
-      }, 300);
-    }
+  // 确认白色实线轮廓
+  if (item.solidOutlineSrc) {
+    const solidOutline = document.createElement("a-image");
+    solidOutline.setAttribute("src", `#${item.id}-outline`);
+    solidOutline.setAttribute("width", IMAGE_SIZE * OUTLINE_SCALE);
+    solidOutline.setAttribute("height", IMAGE_SIZE * OUTLINE_SCALE);
+    solidOutline.setAttribute("material", "transparent:true; opacity:1; blending:additive; depthWrite:false; depthTest:false");
+    solidOutline.setAttribute("visible", false);
+    solidOutline.setAttribute("position", "0 0 0.03");
+    group.appendChild(solidOutline);
+    group.objectData.solidOutlineImage = solidOutline;
+  }
 
-    loadingBar.style.width = `${progress}%`;
-    loadingText.textContent = `Loading ${Math.round(progress)}%`;
-  }, intervalTime);
+  // 标签
+  const label = createTextLabel(item.label);
+  label.setAttribute("position", "0 -1.05 0.04");
+  group.appendChild(label);
+  group.objectData.labelEntity = label;
+
+  setupInteractiveEvents(group);
+
+  const objectRecord = {
+    el: group,
+    type: "sound-object",
+    id: item.id
+  };
+
+  interactiveObjects.push(objectRecord);
+  selectableObjects.push(objectRecord);
+
+  return group;
 }
 
-function startControllerDetection() {
-  const detectText = document.querySelector("#detect-text");
+// ===============================
+// 互动事件
+// ===============================
 
-  let elapsed = 0;
-  const detectDuration = 5000;
-  const intervalTime = 250;
 
-  const timer = setInterval(() => {
-    elapsed += intervalTime;
+// ===============================
+// 电脑键盘测试（非手柄）
 
-    const gamepad = findConnectedGamepad();
-
-    if (gamepad) {
-      clearInterval(timer);
-      gamepadIndex = gamepad.index;
-      controlMode = "gamepad";
-      showControllerGuide();
-      return;
-    }
-
-    const leftSeconds = Math.max(0, Math.ceil((detectDuration - elapsed) / 1000));
-    detectText.textContent = `正在检测手柄连接，请稍候... ${leftSeconds}s`;
-
-    if (elapsed >= detectDuration) {
-      clearInterval(timer);
-      controlMode = "gaze";
-      showGazeGuide();
-    }
-  }, intervalTime);
-}
-
-function showControllerGuide() {
-  document.querySelector("#detect-panel").classList.add("hidden");
-  document.querySelector("#controller-guide-panel").classList.remove("hidden");
-}
-
-function showGazeGuide() {
-  document.querySelector("#detect-panel").classList.add("hidden");
-  document.querySelector("#gaze-guide-panel").classList.remove("hidden");
-}
 // ===============================
 // 加载流程
 // ===============================
@@ -419,6 +455,71 @@ function preloadAssets() {
 // ===============================
 
 
+// ===============================
+// 加载流程：进度条结束后进入控制方式检测
+// ===============================
+
+function initLoadingFlow() {
+  const loadingPanel = document.querySelector("#loading-panel");
+  const detectPanel = document.querySelector("#detect-panel");
+  const loadingBar = document.querySelector("#loading-bar");
+  const loadingText = document.querySelector("#loading-text");
+  const detectText = document.querySelector("#detect-text");
+
+  let progress = 0;
+
+  const timer = setInterval(() => {
+    progress += 4;
+
+    if (progress > 100) {
+      progress = 100;
+    }
+
+    if (loadingBar) {
+      loadingBar.style.width = `${progress}%`;
+    }
+
+    if (loadingText) {
+      loadingText.textContent = `Loading ${progress}%`;
+    }
+
+    if (progress >= 100) {
+      clearInterval(timer);
+
+      setTimeout(() => {
+        if (loadingPanel) {
+          loadingPanel.classList.add("hidden");
+        }
+
+        if (detectPanel) {
+          detectPanel.classList.remove("hidden");
+        }
+
+        if (detectText) {
+          detectText.textContent = "正在检测手柄连接，请稍候...";
+        }
+
+        setTimeout(() => {
+          const gamepad = findConnectedGamepad();
+
+          if (gamepad) {
+            gamepadIndex = gamepad.index;
+            controlMode = "gamepad";
+            showControllerGuide();
+          } else {
+            controlMode = "gaze";
+            showGazeGuide();
+          }
+        }, 900);
+      }, 250);
+    }
+  }, 35);
+}
+
+function setupGuideButtons() {
+  setupGuideButtonsAndFullScreen();
+}
+
 function showControllerGuide() {
   document.querySelector("#detect-panel").classList.add("hidden");
   document.querySelector("#controller-guide-panel").classList.remove("hidden");
@@ -429,10 +530,6 @@ function showGazeGuide() {
   document.querySelector("#gaze-guide-panel").classList.remove("hidden");
 }
 
-function setupGuideButtons() {
-  document.querySelector("#enter-controller-btn").addEventListener("click", enterScene);
-  document.querySelector("#enter-gaze-btn").addEventListener("click", enterScene);
-}
 
 function setupImageFallbacks() {
   const guideImages = document.querySelectorAll(".guide-image");
@@ -579,114 +676,6 @@ function clearInteractiveObjects() {
 // 创建漂浮意象
 // ===============================
 
-function createFloatingObject(item, index) {
-  const group = document.createElement("a-entity");
-  group.classList.add("interactive");
-
-  group.setAttribute("position", vectorToPositionString(item.position));
-
-  group.objectData = {
-    type: "sound-object",
-    item,
-    id: item.id,
-    label: item.label,
-    soundName: item.soundName,
-    audioSrc: item.audioSrc,
-    basePosition: item.position.clone(),
-    floatOffset: index * 0.8,
-    baseScale: 1,
-    confirmed: false
-  };
-
-  let mainImage = null;
-
-  if (item.imageSrc) {
-    mainImage = document.createElement("a-image");
-    mainImage.classList.add("interactive-hitbox");
-    mainImage.setAttribute("src", item.imageSrc);
-    mainImage.setAttribute("width", IMAGE_SIZE);
-    mainImage.setAttribute("height", IMAGE_SIZE);
-    
-    mainImage.setAttribute(
-      "material",
-      "transparent: true; opacity: 0.95; depthWrite: false; depthTest: false"
-    );
-    mainImage.object3D.renderOrder = 1;
-    group.appendChild(mainImage);
-  } else {
-    mainImage = document.createElement("a-sphere");
-    mainImage.classList.add("interactive-hitbox");
-    mainImage.setAttribute("radius", "0.22");
-    mainImage.setAttribute("color", "#ffffff");
-    mainImage.setAttribute("material", "transparent: true; opacity: 0.82");
-    mainImage.object3D.renderOrder = 1;
-    group.appendChild(mainImage);
-  }
-
-  const highlightImage = document.createElement("a-image");
-
-  if (item.imageSrc) {
-    highlightImage.setAttribute("src", item.imageSrc);
-    highlightImage.setAttribute("width", IMAGE_SIZE);
-    highlightImage.setAttribute("height", IMAGE_SIZE);
-    highlightImage.setAttribute(
-      "material",
-      `transparent: true; opacity: ${PRESELECT_WHITE_OPACITY}; color: #ffffff; blending: additive; depthWrite: false; depthTest: false`
-    );
-  } else {
-    highlightImage.setAttribute("width", 0.7);
-    highlightImage.setAttribute("height", 0.7);
-    highlightImage.setAttribute(
-      "material",
-      `transparent: true; opacity: ${PRESELECT_WHITE_OPACITY}; color: #ffffff; depthWrite: false; depthTest: false`
-    );
-  }
-
-  highlightImage.setAttribute("visible", false);
-  highlightImage.setAttribute("position", "0 0 0.015");
-  highlightImage.object3D.renderOrder = 2;
-  group.appendChild(highlightImage);
-
-  let solidOutlineImage = null;
-
-  if (item.solidOutlineSrc) {
-    solidOutlineImage = document.createElement("a-image");
-    solidOutlineImage.setAttribute("src", item.solidOutlineSrc);
-    solidOutlineImage.setAttribute("width", IMAGE_SIZE * OUTLINE_SCALE);
-    solidOutlineImage.setAttribute("height", IMAGE_SIZE * OUTLINE_SCALE);
-    solidOutlineImage.setAttribute(
-      "material",
-      "transparent: true; opacity: 1; blending: additive; depthWrite: false; depthTest: false"
-    );
-    solidOutlineImage.setAttribute("position", "0 0 0.03");
-    solidOutlineImage.setAttribute("visible", false);
-    solidOutlineImage.object3D.renderOrder = 3;
-    group.appendChild(solidOutlineImage);
-  }
-
-  const label = createTextLabel(item.label);
-  label.setAttribute("position", "0 -1.05 0.04");
-  label.object3D.renderOrder = 4;
-  group.appendChild(label);
-
-  group.objectData.mainImage = mainImage;
-  group.objectData.highlightImage = highlightImage;
-  group.objectData.solidOutlineImage = solidOutlineImage;
-  group.objectData.labelEntity = label;
-
-  setupInteractiveEvents(group);
-
-  const objectRecord = {
-    el: group,
-    type: "sound-object",
-    id: item.id
-  };
-
-  interactiveObjects.push(objectRecord);
-  selectableObjects.push(objectRecord);
-
-  return group;
-}
 
 // ===============================
 // 创建完成按钮
@@ -810,47 +799,28 @@ function roundRect(context, x, y, width, height, radius) {
 // ===============================
 
 function setupInteractiveEvents(group) {
-  const bindTargetEvents = (target) => {
+  const bindEvents = (target) => {
     target.addEventListener("mouseenter", () => {
-      if (!hasEnteredScene) return;
-      if (controlMode !== "gaze") return;
-
-      const index = selectableObjects.findIndex((object) => {
-        return object.el === group;
-      });
-
-      if (index >= 0) {
-        selectedIndex = index;
-        updateSelectionInfo();
-        updateObjectVisualStates();
-      }
+      if (!hasEnteredScene || controlMode !== "gaze") return;
+      selectedIndex = selectableObjects.findIndex(o => o.el === group);
+      updateObjectVisualStates();
+      updateSelectionInfo();
     });
-
     target.addEventListener("click", () => {
-      if (!hasEnteredScene) return;
-      if (controlMode !== "gaze") return;
-
-      const index = selectableObjects.findIndex((object) => {
-        return object.el === group;
-      });
-
-      if (index >= 0) {
-        selectedIndex = index;
-        updateSelectionInfo();
-        handleAButtonClick();
-      }
+      if (!hasEnteredScene || controlMode !== "gaze") return;
+      selectedIndex = selectableObjects.findIndex(o => o.el === group);
+      updateObjectVisualStates();
+      handleAButtonClick();
+    });
+    target.addEventListener("touchstart", () => {
+      if (!hasEnteredScene || controlMode !== "gaze") return;
+      selectedIndex = selectableObjects.findIndex(o => o.el === group);
+      updateObjectVisualStates();
+      handleAButtonClick();
     });
   };
-
-  // 父级也绑定一次，保险
-  bindTargetEvents(group);
-
-  // 真正被 raycaster 扫到的是这些有几何体的子元素
-  const hitboxes = group.querySelectorAll(".interactive-hitbox");
-
-  hitboxes.forEach((hitbox) => {
-    bindTargetEvents(hitbox);
-  });
+  bindEvents(group);
+  group.querySelectorAll(".interactive-hitbox").forEach(bindEvents);
 }
 
 // ===============================
