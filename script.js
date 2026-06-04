@@ -651,8 +651,16 @@ function loadLevel(levelName) {
   const finishButton = createFinishButton();
   levelRoot.appendChild(finishButton);
 
-  selectedIndex = Math.floor(Math.random() * data.objects.length);
-  updateSelectionInfo();
+  // 手柄模式：默认预选第一个意象，方便摇杆操作
+  // 眼神模式：默认不预选任何物体，只有视线看过去才预选
+  if (controlMode === "gamepad") {
+    selectedIndex = 0;
+    updateSelectionInfo();
+  } else {
+    selectedIndex = -1;
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象进行预选`);
+  }
+
   updateObjectVisualStates();
 }
 
@@ -800,25 +808,51 @@ function roundRect(context, x, y, width, height, radius) {
 
 function setupInteractiveEvents(group) {
   const bindEvents = (target) => {
+    // 视线进入：进入预选状态
     target.addEventListener("mouseenter", () => {
       if (!hasEnteredScene || controlMode !== "gaze") return;
+
       selectedIndex = selectableObjects.findIndex(o => o.el === group);
+
       updateObjectVisualStates();
       updateSelectionInfo();
     });
+
+    // 视线离开：取消预选状态
+    target.addEventListener("mouseleave", () => {
+      if (!hasEnteredScene || controlMode !== "gaze") return;
+
+      const currentIndex = selectableObjects.findIndex(o => o.el === group);
+
+      // 只有离开的这个物体正好是当前预选物体时，才取消预选
+      if (selectedIndex === currentIndex) {
+        selectedIndex = -1;
+        updateObjectVisualStates();
+        updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象进行预选`);
+      }
+    });
+
+    // 看着物体点击：确认 / 取消
     target.addEventListener("click", () => {
       if (!hasEnteredScene || controlMode !== "gaze") return;
+
       selectedIndex = selectableObjects.findIndex(o => o.el === group);
+
       updateObjectVisualStates();
       handleAButtonClick();
     });
+
+    // 手机触摸：确认 / 取消
     target.addEventListener("touchstart", () => {
       if (!hasEnteredScene || controlMode !== "gaze") return;
+
       selectedIndex = selectableObjects.findIndex(o => o.el === group);
+
       updateObjectVisualStates();
       handleAButtonClick();
     });
   };
+
   bindEvents(group);
   group.querySelectorAll(".interactive-hitbox").forEach(bindEvents);
 }
