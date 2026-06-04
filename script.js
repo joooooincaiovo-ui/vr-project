@@ -1626,7 +1626,7 @@ function updateObjectVisualStates() {
     // ===============================
     if (data.outlineImage) {
   data.outlineImage.object3D.renderOrder = 10; // 确保漂浮意象描边永远在天空球之上
-}
+
       if (isConfirmed) {
         data.outlineImage.setAttribute("visible", true);
         data.outlineImage.setAttribute("material", "opacity", 1);
