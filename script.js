@@ -635,36 +635,10 @@ function enterScene() {
 // ===============================
 
 function loadPanoramas() {
-  const loader = new THREE.CubeTextureLoader();
-  loader.setPath("./assets/images/");
-
   panoramas = {
-    floor1: createStableCubeTexture(loader, [
-      "px.png",
-      "nx.png",
-      "py.png",
-      "ny.png",
-      "pz.png",
-      "nz.png"
-    ]),
-
-    floor2: createStableCubeTexture(loader, [
-      "2-4.png",
-      "2-1.png",
-      "2-5.png",
-      "2-2.png",
-      "2-6.png",
-      "2-3.png"
-    ]),
-
-    floor3: createStableCubeTexture(loader, [
-      "3-4.png",
-      "3-1.png",
-      "3-5.png",
-      "3-2.png",
-      "3-6.png",
-      "3-3.png"
-    ])
+    floor1: "./assets/images/floor1-equirect.png",
+    floor2: "./assets/images/floor2-equirect.png",
+    floor3: "./assets/images/floor3-equirect.png"
   };
 }
 
@@ -693,7 +667,22 @@ function createStableCubeTexture(loader, files) {
 
 function setPanorama(levelName) {
   if (!sceneEl || !panoramas[levelName]) return;
-  sceneEl.object3D.background = panoramas[levelName];
+
+  let sky = document.querySelector("#panorama-sky");
+
+  if (!sky) {
+    sky = document.createElement("a-sky");
+    sky.setAttribute("id", "panorama-sky");
+    sky.setAttribute("radius", "500");
+    sky.setAttribute("rotation", "0 -90 0");  // 可以根据需要微调方向
+    sky.setAttribute("material", "shader: flat; side: back");
+    sceneEl.appendChild(sky);
+  }
+
+  sky.setAttribute("src", panoramas[levelName]);
+
+  // 不再使用 CubeTexture 背景
+  sceneEl.object3D.background = null;
 }
 
 // ===============================
@@ -729,10 +718,10 @@ function loadLevel(levelName) {
   const data = levelData[levelName];
   if (!data) return;
 
-  //data.objects.forEach((item, index) => {
-    //const objectEntity = createFloatingObject(item, index);
-   // levelRoot.appendChild(objectEntity);
- // });
+  data.objects.forEach((item, index) => {
+    const objectEntity = createFloatingObject(item, index);
+    levelRoot.appendChild(objectEntity);
+  });
 
   const finishButton = createFinishButton();
   levelRoot.appendChild(finishButton);
