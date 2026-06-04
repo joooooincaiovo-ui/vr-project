@@ -729,10 +729,10 @@ function loadLevel(levelName) {
   const data = levelData[levelName];
   if (!data) return;
 
-  data.objects.forEach((item, index) => {
-    const objectEntity = createFloatingObject(item, index);
-    levelRoot.appendChild(objectEntity);
-  });
+  //data.objects.forEach((item, index) => {
+    //const objectEntity = createFloatingObject(item, index);
+   // levelRoot.appendChild(objectEntity);
+ // });
 
   const finishButton = createFinishButton();
   levelRoot.appendChild(finishButton);
