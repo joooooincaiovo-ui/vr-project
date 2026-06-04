@@ -166,86 +166,106 @@ const levelData = {
   },
 
   floor2: {
-    title: "F2 室外空地",
-    objects: [
-      {
-        id: "f2-guitar",
-        label: "吉他",
-        soundName: "吉他",
-        audioSrc: "./assets/sounds/f2-01.mp3",
-        position: createPositionByAngle(-55, 8, 5)
-      },
-      {
-        id: "f2-piano",
-        label: "钢琴键",
-        soundName: "钢琴",
-        audioSrc: "./assets/sounds/f2-02.mp3",
-        position: createPositionByAngle(15, 7, 5)
-      },
-      {
-        id: "f2-glass",
-        label: "玻璃碎片",
-        soundName: "舞蹈律动声音",
-        audioSrc: "./assets/sounds/f2-03.mp3",
-        position: createPositionByAngle(75, 12, 5)
-      },
-      {
-        id: "f2-leaf",
-        label: "树叶",
-        soundName: "阳光的声音",
-        audioSrc: "./assets/sounds/f2-04.mp3",
-        position: createPositionByAngle(145, 8, 5)
-      },
-      {
-        id: "f2-stone",
-        label: "小石头",
-        soundName: "石质乐器的声音",
-        audioSrc: "./assets/sounds/f2-05.mp3",
-        position: createPositionByAngle(-145, 5, 5)
-      }
-    ]
-  },
+  title: "F2 室外空地",
+  objects: [
+    {
+      id: "f2-guitar",
+      label: "吉他",
+      soundName: "吉他",
+      audioSrc: "./assets/sounds/f2-01.mp3",
+      imageSrc: "./assets/f2-images/f2-guitar.png",
+      solidOutlineSrc: "./assets/f2-images/f2-guitar-selected.png",
+      position: createPositionByAngle(-55, 8, 5)
+    },
+    {
+      id: "f2-piano",
+      label: "钢琴键",
+      soundName: "钢琴",
+      audioSrc: "./assets/sounds/f2-02.mp3",
+      imageSrc: "./assets/f2-images/f2-piano.png",
+      solidOutlineSrc: "./assets/f2-images/f2-piano-selected.png",
+      position: createPositionByAngle(15, 7, 5)
+    },
+    {
+      id: "f2-glass",
+      label: "玻璃碎片",
+      soundName: "舞蹈律动声音",
+      audioSrc: "./assets/sounds/f2-03.mp3",
+      imageSrc: "./assets/f2-images/f2-glass.png",
+      solidOutlineSrc: "./assets/f2-images/f2-glass-selected.png",
+      position: createPositionByAngle(75, 12, 5)
+    },
+    {
+      id: "f2-leaf",
+      label: "树叶",
+      soundName: "阳光的声音",
+      audioSrc: "./assets/sounds/f2-04.mp3",
+      imageSrc: "./assets/f2-images/f2-leaf.png",
+      solidOutlineSrc: "./assets/f2-images/f2-leaf-selected.png",
+      position: createPositionByAngle(145, 8, 5)
+    },
+    {
+      id: "f2-stone",
+      label: "小石头",
+      soundName: "石质乐器的声音",
+      audioSrc: "./assets/sounds/f2-05.mp3",
+      imageSrc: "./assets/f2-images/f2-stone.png",
+      solidOutlineSrc: "./assets/f2-images/f2-stone-selected.png",
+      position: createPositionByAngle(-145, 5, 5)
+    }
+  ]
+},
 
   floor3: {
-    title: "F3 二楼中庭",
-    objects: [
-      {
-        id: "f3-book",
-        label: "绘本",
-        soundName: "木地板脚步声",
-        audioSrc: "./assets/sounds/f3-01.mp3",
-        position: createPositionByAngle(-60, 6, 5)
-      },
-      {
-        id: "f3-camera",
-        label: "相机",
-        soundName: "清晨阳光洒落的声音",
-        audioSrc: "./assets/sounds/f3-02.mp3",
-        position: createPositionByAngle(10, 10, 5)
-      },
-      {
-        id: "f3-doll",
-        label: "玩偶",
-        soundName: "灰尘漂浮的声音",
-        audioSrc: "./assets/sounds/f3-03.mp3",
-        position: createPositionByAngle(75, 8, 5)
-      },
-      {
-        id: "f3-hand",
-        label: "木制的手",
-        soundName: "轻微触碰木头的声音",
-        audioSrc: "./assets/sounds/f3-04.mp3",
-        position: createPositionByAngle(145, 9, 5)
-      },
-      {
-        id: "f3-pupa",
-        label: "茧",
-        soundName: "细小的生命声",
-        audioSrc: "./assets/sounds/f3-05.mp3",
-        position: createPositionByAngle(-145, 7, 5)
-      }
-    ]
-  }
+  title: "F3 二楼中庭",
+  objects: [
+    {
+      id: "f3-book",
+      label: "绘本",
+      soundName: "木地板脚步声",
+      audioSrc: "./assets/sounds/f3-01.mp3",
+      imageSrc: "./assets/f3-images/f3-book.png",
+      solidOutlineSrc: "./assets/f3-images/f3-book-selected.png",
+      position: createPositionByAngle(-60, 6, 5)
+    },
+    {
+      id: "f3-camera",
+      label: "相机",
+      soundName: "清晨阳光洒落的声音",
+      audioSrc: "./assets/sounds/f3-02.mp3",
+      imageSrc: "./assets/f3-images/f3-camera.png",
+      solidOutlineSrc: "./assets/f3-images/f3-camera-selected.png",
+      position: createPositionByAngle(10, 10, 5)
+    },
+    {
+      id: "f3-doll",
+      label: "玩偶",
+      soundName: "灰尘漂浮的声音",
+      audioSrc: "./assets/sounds/f3-03.mp3",
+      imageSrc: "./assets/f3-images/f3-bear.png",
+      solidOutlineSrc: "./assets/f3-images/f3-bear-selected.png",
+      position: createPositionByAngle(75, 8, 5)
+    },
+    {
+      id: "f3-hand",
+      label: "木制的手",
+      soundName: "轻微触碰木头的声音",
+      audioSrc: "./assets/sounds/f3-04.mp3",
+      imageSrc: "./assets/f3-images/f3-woodheand.png",
+      solidOutlineSrc: "./assets/f3-images/f3-woodheand-selected.png",
+      position: createPositionByAngle(145, 9, 5)
+    },
+    {
+      id: "f3-pupa",
+      label: "黄门",
+      soundName: "细小的生命声",
+      audioSrc: "./assets/sounds/f3-05.mp3",
+      imageSrc: "./assets/f3-images/f3-yellowdoor.png",
+      solidOutlineSrc: "./assets/f3-images/f3-yellowdoor-selected.png",
+      position: createPositionByAngle(-145, 7, 5)
+    }
+  ]
+}
 };
 
 // ===============================
@@ -308,58 +328,72 @@ function createFloatingObject(item, index) {
   group.classList.add("interactive");
 
   group.setAttribute("position", vectorToPositionString(item.position));
+
   group.objectData = {
-  type: "sound-object",
-  item,
-  id: item.id,
-  label: item.label,
-  soundName: item.soundName,
-  audioSrc: item.audioSrc,
-  basePosition: item.position.clone(),
-  floatOffset: index * 0.8,
-  baseScale: 1,
-  confirmed: false
-};
+    type: "sound-object",
+    item,
+    id: item.id,
+    label: item.label,
+    soundName: item.soundName,
+    audioSrc: item.audioSrc,
+    basePosition: item.position.clone(),
+    floatOffset: index * 0.8,
+    baseScale: 1,
+    confirmed: false
+  };
 
-  // 主图
+  // ===============================
+  // 底层：原图
+  // ===============================
   const mainImage = document.createElement("a-image");
-  mainImage.setAttribute("src", `#${item.id}-img`);
-  mainImage.setAttribute("width", IMAGE_SIZE);
-  mainImage.setAttribute("height", IMAGE_SIZE);
-  mainImage.classList.add("interactive-hitbox");
-  group.appendChild(mainImage);
 
-  // 预选白色滤镜
-  const highlightImage = document.createElement("a-image");
-  highlightImage.setAttribute("src", `#${item.id}-img`);
-  highlightImage.setAttribute("width", IMAGE_SIZE);
-  highlightImage.setAttribute("height", IMAGE_SIZE);
-  highlightImage.setAttribute(
-  "material",
-  `transparent:true; opacity:${PRESELECT_WHITE_OPACITY}; color:#ffffff; alphaTest:0.08; depthWrite:false; depthTest:true`
-);
-  highlightImage.setAttribute("visible", false);
-  highlightImage.setAttribute("position", "0 0 0.015");
-  group.appendChild(highlightImage);
-  group.objectData.highlightImage = highlightImage;
-
-  // 确认白色实线轮廓
-  if (item.solidOutlineSrc) {
-    const solidOutline = document.createElement("a-image");
-    solidOutline.setAttribute("src", `#${item.id}-outline`);
-    solidOutline.setAttribute("width", IMAGE_SIZE * OUTLINE_SCALE);
-    solidOutline.setAttribute("height", IMAGE_SIZE * OUTLINE_SCALE);
-    solidOutline.setAttribute(
-  "material",
-  "transparent:true; opacity:1; alphaTest:0.08; depthWrite:false; depthTest:true"
-);
-    solidOutline.setAttribute("visible", false);
-    solidOutline.setAttribute("position", "0 0 0.03");
-    group.appendChild(solidOutline);
-    group.objectData.solidOutlineImage = solidOutline;
+  if (item.imageSrc) {
+    mainImage.setAttribute("src", `#${item.id}-img`);
   }
 
+  mainImage.setAttribute("width", IMAGE_SIZE);
+  mainImage.setAttribute("height", IMAGE_SIZE);
+  mainImage.setAttribute(
+    "material",
+    "transparent:true; opacity:0.94; depthWrite:false; depthTest:true; alphaTest:0.01; side:double"
+  );
+  mainImage.classList.add("interactive-hitbox");
+  mainImage.setAttribute("position", "0 0 0");
+
+  group.appendChild(mainImage);
+  group.objectData.mainImage = mainImage;
+
+  // ===============================
+  // 上层：selected 白色描边图
+  // 注意：这里不是替换原图，而是叠加在原图上
+  // ===============================
+  if (item.solidOutlineSrc) {
+    const outlineImage = document.createElement("a-image");
+
+    outlineImage.setAttribute("src", `#${item.id}-outline`);
+    outlineImage.setAttribute("width", IMAGE_SIZE * OUTLINE_SCALE);
+    outlineImage.setAttribute("height", IMAGE_SIZE * OUTLINE_SCALE);
+
+    // 重点：
+    // 不使用 additive
+    // 不使用 depthTest:false
+    // 只作为普通透明贴图叠加
+    outlineImage.setAttribute(
+      "material",
+      "transparent:true; opacity:0; depthWrite:false; depthTest:true; alphaTest:0.01; side:double"
+    );
+
+    // 稍微往前一点，避免和原图完全重合导致手机端闪烁
+    outlineImage.setAttribute("position", "0 0 0.035");
+    outlineImage.setAttribute("visible", false);
+
+    group.appendChild(outlineImage);
+    group.objectData.outlineImage = outlineImage;
+  }
+
+  // ===============================
   // 标签
+  // ===============================
   const label = createTextLabel(item.label);
   label.setAttribute("position", "0 -1.05 0.04");
   group.appendChild(label);
@@ -1419,6 +1453,9 @@ function updateObjectVisualStates() {
     const isConfirmed = data.id && confirmedSoundIds.has(data.id);
     const isFinishButton = data.type === "finish-button";
 
+    // ===============================
+    // 位置与朝向
+    // ===============================
     if (data.followCamera) {
       updateFinishButtonFollowCamera(entity);
     } else {
@@ -1438,40 +1475,93 @@ function updateObjectVisualStates() {
       entity.object3D.lookAt(cameraWorldPosition);
     }
 
+    // ===============================
+    // 完成按钮
+    // ===============================
+    if (isFinishButton) {
+      let finishScale = 1;
+
+      if (isSelected) {
+        finishScale = 1.28;
+      }
+
+      entity.object3D.scale.set(finishScale, finishScale, finishScale);
+
+      if (data.mainImage) {
+        data.mainImage.setAttribute("material", "opacity", isSelected ? 1 : 0.9);
+      }
+
+      return;
+    }
+
+    // ===============================
+    // 普通意象缩放
+    // ===============================
     let scaleMultiplier = 1;
 
-    if (isSelected) {
-      scaleMultiplier = isFinishButton ? 1.28 : PRESELECT_SCALE;
+    if (isConfirmed) {
+      scaleMultiplier = 1.08 + Math.sin(time * 2.4) * 0.018;
+    } else if (isSelected) {
+      scaleMultiplier = PRESELECT_SCALE;
     }
 
     entity.object3D.scale.set(scaleMultiplier, scaleMultiplier, scaleMultiplier);
 
-    if (data.highlightImage) {
-      data.highlightImage.setAttribute("visible", isSelected && !isConfirmed);
-    }
-
-    if (data.solidOutlineImage) {
-      data.solidOutlineImage.setAttribute("visible", isConfirmed);
-
-      const breatheScale = isConfirmed
-        ? 1 + Math.sin(time * 2.4) * 0.025
-        : 1;
-
-      data.solidOutlineImage.object3D.scale.set(
-        breatheScale,
-        breatheScale,
-        breatheScale
-      );
-    }
-
-    if (data.mainImage && data.mainImage.getAttribute("material")) {
-      if (isSelected) {
+    // ===============================
+    // 原图透明度
+    // ===============================
+    if (data.mainImage) {
+      if (isConfirmed) {
         data.mainImage.setAttribute("material", "opacity", 1);
-      } else if (isConfirmed) {
-        data.mainImage.setAttribute("material", "opacity", 0.96);
+      } else if (isSelected) {
+        data.mainImage.setAttribute("material", "opacity", 1);
       } else {
-        data.mainImage.setAttribute("material", "opacity", 0.86);
+        data.mainImage.setAttribute("material", "opacity", 0.92);
       }
+    }
+
+    // ===============================
+    // 白色描边层
+    // 预选：半透明描边
+    // 确认：完整描边
+    // 普通：隐藏描边
+    // ===============================
+    if (data.outlineImage) {
+      if (isConfirmed) {
+        data.outlineImage.setAttribute("visible", true);
+        data.outlineImage.setAttribute("material", "opacity", 1);
+
+        const breatheScale = 1 + Math.sin(time * 2.4) * 0.02;
+        data.outlineImage.object3D.scale.set(
+          breatheScale,
+          breatheScale,
+          breatheScale
+        );
+      } else if (isSelected) {
+        data.outlineImage.setAttribute("visible", true);
+        data.outlineImage.setAttribute("material", "opacity", 0.55);
+        data.outlineImage.object3D.scale.set(1, 1, 1);
+      } else {
+        data.outlineImage.setAttribute("visible", false);
+        data.outlineImage.setAttribute("material", "opacity", 0);
+        data.outlineImage.object3D.scale.set(1, 1, 1);
+      }
+    }
+
+    // 如果你代码里还残留旧的白色滤镜层，强制关掉
+    if (data.highlightImage) {
+      data.highlightImage.setAttribute("visible", false);
+    }
+
+    // 如果你代码里还残留旧的白圈层，也强制关掉
+    if (data.preselectRing) {
+      data.preselectRing.setAttribute("visible", false);
+    }
+
+    // 如果你代码里还残留旧的 solidOutlineImage，也强制关掉
+    // 因为现在统一使用 data.outlineImage
+    if (data.solidOutlineImage) {
+      data.solidOutlineImage.setAttribute("visible", false);
     }
   });
 }
