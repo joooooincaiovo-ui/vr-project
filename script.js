@@ -705,9 +705,9 @@ function enterScene() {
 
 function loadPanoramas() {
   panoramas = {
-    floor1: "./assets/images/floor1-equirect.png",
-    floor2: "./assets/images/floor2-equirect.png",
-    floor3: "./assets/images/floor3-equirect.png"
+    floor1: "./assets/images/floor1-equirect.jpg",
+    floor2: "./assets/images/floor2-equirect.jpg",
+    floor3: "./assets/images/floor3-equirect.jpg"
   };
 }
 
@@ -744,18 +744,15 @@ function setPanorama(levelName) {
     sky.setAttribute("id", "panorama-sky");
     sky.setAttribute("radius", "500");
     sky.setAttribute("rotation", "0 -90 0");
-
     sceneEl.appendChild(sky);
   }
 
-  // 先移除旧 src，避免 VR 模式下旧材质残留
   sky.removeAttribute("src");
   sky.removeAttribute("material");
 
-  // 重新设置全景图
   sky.setAttribute("src", panoramas[levelName]);
 
-  // 重点：强制材质完全不透明，避免 PNG 透明边缘在 VR 分屏中露出白色背景
+  // 强制材质不透明，避免 PNG alpha 导致的残影
   sky.setAttribute(
     "material",
     [
@@ -763,14 +760,12 @@ function setPanorama(levelName) {
       "side: back",
       "transparent: false",
       "opacity: 1",
-      "alphaTest: 0",
       "depthWrite: false",
-      "depthTest: false",
-      "color: #ffffff"
+      "depthTest: false"
     ].join("; ")
   );
 
-  // 场景背景强制设为黑色，避免透明处露出白底
+  // 场景背景黑色
   if (sceneEl.object3D) {
     sceneEl.object3D.background = new THREE.Color(0x000000);
   }
@@ -1630,6 +1625,8 @@ function updateObjectVisualStates() {
     // 普通：隐藏描边
     // ===============================
     if (data.outlineImage) {
+  data.outlineImage.object3D.renderOrder = 10; // 确保漂浮意象描边永远在天空球之上
+}
       if (isConfirmed) {
         data.outlineImage.setAttribute("visible", true);
         data.outlineImage.setAttribute("material", "opacity", 1);
