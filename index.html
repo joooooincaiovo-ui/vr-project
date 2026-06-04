@@ -92,36 +92,35 @@
 
   <!-- A-Frame 场景 -->
   <a-scene
-    vr-mode-ui="enabled: true"
-    embedded
-    renderer="antialias: true; alpha: false; logarithmicDepthBuffer: true"
+  id="vr-scene"
+  vr-mode-ui="enabled: true"
+  embedded
+  renderer="antialias: true; alpha: false; logarithmicDepthBuffer: true"
 >
-    <a-assets></a-assets>
+  <a-assets></a-assets>
 
-    <!-- 玩家摄像机 -->
-    <a-entity id="camera-rig" position="0 0 0">
-      <a-camera
-        id="main-camera"
-        position="0 0 0"
-        look-controls="enabled: true"
-        wasd-controls="enabled: false"
-      >
-        <!-- 非手柄模式用：中心视线光标 -->
-        <a-cursor
-  id="gaze-cursor"
-  class="hidden"
-  fuse="false"
-  raycaster="objects: .interactive-hitbox"
-  material="color: white; opacity: 0.85; transparent: true"
-  geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.014"
-  position="0 0 -1"
-></a-cursor>
-      </a-camera>
-    </a-entity>
+  <!-- 玩家摄像机 -->
+  <a-entity id="camera-rig" position="0 0 0">
+    <a-camera
+      id="main-camera"
+      position="0 0 0"
+      look-controls="enabled: true"
+      wasd-controls="enabled: false"
+    >
+      <a-cursor
+        id="gaze-cursor"
+        class="hidden"
+        fuse="false"
+        raycaster="objects: .interactive-hitbox"
+        material="color: white; opacity: 0.85; transparent: true"
+        geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.014"
+        position="0 0 -1"
+      ></a-cursor>
+    </a-camera>
+  </a-entity>
 
-    <!-- 动态生成的关卡物体会放进这里 -->
-    <a-entity id="level-root"></a-entity>
-  </a-scene>
+  <a-entity id="level-root"></a-entity>
+</a-scene>
 
   <script src="./script.js"></script>
 </body>

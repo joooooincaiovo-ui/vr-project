@@ -431,58 +431,94 @@ function createFloatingObject(item, index) {
 function setupGuideButtonsAndFullScreen() {
   const controllerBtn = document.querySelector("#enter-controller-btn");
   const gazeBtn = document.querySelector("#enter-gaze-btn");
-  const sceneEl = document.querySelector("#vr-scene");
+  const currentSceneEl = document.querySelector("#vr-scene");
 
-  // 统一绑定事件
   const enterHandler = () => {
     if (hasEnteredScene) return;
+
     hasEnteredScene = true;
 
-    // 隐藏教学界面
-    document.querySelector("#start-screen").classList.add("hidden");
-    document.querySelector("#info").classList.remove("hidden");
-    sceneEl.classList.remove("hidden");
+    const startScreen = document.querySelector("#start-screen");
+    const infoPanel = document.querySelector("#info");
+    const gazeCursor = document.querySelector("#gaze-cursor");
+
+    if (startScreen) {
+      startScreen.classList.add("hidden");
+    }
+
+    if (infoPanel) {
+      infoPanel.classList.remove("hidden");
+    }
+
+    if (currentSceneEl) {
+      currentSceneEl.classList.remove("hidden");
+    }
 
     // 手机端全屏请求
     const docEl = document.documentElement;
+
     if (docEl.requestFullscreen) {
       docEl.requestFullscreen().catch(() => {});
-    } else if (docEl.webkitRequestFullscreen) { // Safari
+    } else if (docEl.webkitRequestFullscreen) {
       docEl.webkitRequestFullscreen();
-    } else if (docEl.msRequestFullscreen) { // IE11
+    } else if (docEl.msRequestFullscreen) {
       docEl.msRequestFullscreen();
     }
 
     // 判断控制方式
-    const gazeCursor = document.querySelector("#gaze-cursor");
-    if (controlMode === "gaze") {
-      gazeCursor.classList.remove("hidden");
-      gazeCursor.setAttribute("visible", true);
-      updateInfo("眼神控制：看向意象预选，点击屏幕确认 / 取消");
-    } else {
-      gazeCursor.classList.add("hidden");
-      gazeCursor.setAttribute("visible", false);
-      updateInfo("手柄模式：左摇杆切换 / 向下选择完成 / A确认");
+    if (gazeCursor) {
+      if (controlMode === "gaze") {
+        gazeCursor.classList.remove("hidden");
+        gazeCursor.setAttribute("visible", true);
+        updateInfo(`眼神控制：看向意象，凝视 ${GAZE_CONFIRM_SECONDS} 秒确认 / 取消`);
+      } else {
+        gazeCursor.classList.add("hidden");
+        gazeCursor.setAttribute("visible", false);
+        updateInfo("手柄模式：左摇杆切换 / 向下选择完成 / A确认");
+      }
     }
 
     // 初始化第一关
     currentLevelIndex = 0;
     currentLevelName = levelOrder[currentLevelIndex];
+
     setPanorama(currentLevelName);
     loadLevel(currentLevelName);
   };
 
-  controllerBtn.addEventListener("click", enterHandler);
-  gazeBtn.addEventListener("click", enterHandler);
+  // 安全绑定：元素存在才绑定，不存在也不让页面卡死
+  if (controllerBtn) {
+    controllerBtn.addEventListener("click", () => {
+      controlMode = "gamepad";
+      enterHandler();
+    });
+  } else {
+    console.warn("没有找到 #enter-controller-btn，请检查 index.html 里的按钮 id");
+  }
 
-  // 手机触摸也能进入场景
-  sceneEl.addEventListener("touchstart", (e) => {
-    if (!hasEnteredScene) enterHandler();
-  });
+  if (gazeBtn) {
+    gazeBtn.addEventListener("click", () => {
+      controlMode = "gaze";
+      enterHandler();
+    });
+  } else {
+    console.warn("没有找到 #enter-gaze-btn，请检查 index.html 里的按钮 id");
+  }
 
-  // 键盘 Enter 也可以进入
+  if (currentSceneEl) {
+    currentSceneEl.addEventListener("touchstart", () => {
+      if (!hasEnteredScene) {
+        enterHandler();
+      }
+    });
+  } else {
+    console.warn("没有找到 #vr-scene，请检查 index.html 里的 a-scene id");
+  }
+
   window.addEventListener("keydown", (e) => {
-    if (!hasEnteredScene && e.code === "Enter") enterHandler();
+    if (!hasEnteredScene && e.code === "Enter") {
+      enterHandler();
+    }
   });
 }
 
@@ -491,20 +527,31 @@ function setupGuideButtonsAndFullScreen() {
 // ===============================
 function preloadAssets() {
   const assetsEl = document.querySelector("a-assets");
+
+  if (!assetsEl) {
+    console.warn("没有找到 a-assets，跳过图片预加载");
+    return;
+  }
+
   Object.values(levelData).forEach((level) => {
     level.objects.forEach((item) => {
       if (item.imageSrc) {
         const img = document.createElement("img");
         const id = item.id + "-img";
+
         img.setAttribute("id", id);
         img.setAttribute("src", item.imageSrc);
+
         assetsEl.appendChild(img);
       }
+
       if (item.solidOutlineSrc) {
         const outline = document.createElement("img");
         const id = item.id + "-outline";
+
         outline.setAttribute("id", id);
         outline.setAttribute("src", item.solidOutlineSrc);
+
         assetsEl.appendChild(outline);
       }
     });
@@ -582,13 +629,35 @@ function setupGuideButtons() {
 }
 
 function showControllerGuide() {
-  document.querySelector("#detect-panel").classList.add("hidden");
-  document.querySelector("#controller-guide-panel").classList.remove("hidden");
+  const detectPanel = document.querySelector("#detect-panel");
+  const controllerGuidePanel = document.querySelector("#controller-guide-panel");
+
+  if (detectPanel) {
+    detectPanel.classList.add("hidden");
+  }
+
+  if (controllerGuidePanel) {
+    controllerGuidePanel.classList.remove("hidden");
+  } else {
+    console.warn("没有找到 #controller-guide-panel，自动进入场景");
+    enterScene();
+  }
 }
 
 function showGazeGuide() {
-  document.querySelector("#detect-panel").classList.add("hidden");
-  document.querySelector("#gaze-guide-panel").classList.remove("hidden");
+  const detectPanel = document.querySelector("#detect-panel");
+  const gazeGuidePanel = document.querySelector("#gaze-guide-panel");
+
+  if (detectPanel) {
+    detectPanel.classList.add("hidden");
+  }
+
+  if (gazeGuidePanel) {
+    gazeGuidePanel.classList.remove("hidden");
+  } else {
+    console.warn("没有找到 #gaze-guide-panel，自动进入场景");
+    enterScene();
+  }
 }
 
 
@@ -674,14 +743,13 @@ function setPanorama(levelName) {
     sky = document.createElement("a-sky");
     sky.setAttribute("id", "panorama-sky");
     sky.setAttribute("radius", "500");
-    sky.setAttribute("rotation", "0 -90 0");  // 可以根据需要微调方向
+    sky.setAttribute("rotation", "0 -90 0");
     sky.setAttribute("material", "shader: flat; side: back");
     sceneEl.appendChild(sky);
   }
 
   sky.setAttribute("src", panoramas[levelName]);
 
-  // 不再使用 CubeTexture 背景
   sceneEl.object3D.background = null;
 }
 
