@@ -89,6 +89,27 @@ const PRESELECT_SCALE = 1.16;
 const OUTLINE_SCALE = 1.1;
 
 // ===============================
+// 眼神凝视确认参数
+// ===============================
+
+// 凝视多少秒后确认 / 取消 / 完成
+// 想改成 2 秒就写 2，想改成 4 秒就写 4
+const GAZE_CONFIRM_SECONDS = 2;
+
+// 完成按钮相对于“前两个意象中点”的下移距离
+// 数值越小越靠下，例如 -1.2 会更低，-0.5 会更高
+const FINISH_BUTTON_Y_OFFSET = -1.5;
+
+// 完成按钮稍微向镜头方向靠近一点，避免和意象重叠
+// 数值越大越靠近玩家
+const FINISH_BUTTON_FORWARD_OFFSET = 0.35;
+
+let gazeTargetEl = null;
+let gazeTimer = null;
+let gazeProgressTimer = null;
+let gazeStartTime = 0;
+
+// ===============================
 // 三关数据
 // ===============================
 
@@ -638,6 +659,8 @@ function vectorToPositionString(vector) {
 function loadLevel(levelName) {
   clearInteractiveObjects();
 
+  cancelGazeConfirm();
+
   currentLevelName = levelName;
 
   const data = levelData[levelName];
@@ -658,13 +681,15 @@ function loadLevel(levelName) {
     updateSelectionInfo();
   } else {
     selectedIndex = -1;
-    updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象进行预选`);
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象，凝视 ${GAZE_CONFIRM_SECONDS} 秒确认`);
   }
 
   updateObjectVisualStates();
 }
 
 function clearInteractiveObjects() {
+  cancelGazeConfirm();
+
   interactiveObjects.forEach((objectData) => {
     objectData.el.remove();
   });
@@ -693,12 +718,14 @@ function createFinishButton() {
   const group = document.createElement("a-entity");
   group.classList.add("interactive");
 
-  group.setAttribute("position", vectorToPositionString(createPositionByAngle(0, -12, 4.5)));
+  const finishPosition = getFixedFinishButtonPosition();
+  group.setAttribute("position", vectorToPositionString(finishPosition));
 
   group.objectData = {
     type: "finish-button",
     label: "完成",
-    followCamera: true,
+    followCamera: false,
+    basePosition: finishPosition.clone(),
     baseScale: 1,
     floatOffset: 9
   };
@@ -736,6 +763,32 @@ function createFinishButton() {
   selectableObjects.push(objectRecord);
 
   return group;
+}
+
+function getFixedFinishButtonPosition() {
+  const data = levelData[currentLevelName];
+
+  // 如果当前关卡至少有两个意象，就放在前两个意象中间偏下
+  if (data && data.objects && data.objects.length >= 2) {
+    const posA = data.objects[0].position;
+    const posB = data.objects[1].position;
+
+    const middle = new THREE.Vector3()
+      .addVectors(posA, posB)
+      .multiplyScalar(0.5);
+
+    // 向下移动
+    middle.y += FINISH_BUTTON_Y_OFFSET;
+
+    // 稍微往玩家方向靠近，避免和意象贴太近
+    const towardCamera = middle.clone().normalize().multiplyScalar(-FINISH_BUTTON_FORWARD_OFFSET);
+    middle.add(towardCamera);
+
+    return middle;
+  }
+
+  // 备用位置：如果某关数据异常，就放在正前方偏下
+  return createPositionByAngle(0, -12, 4.5);
 }
 
 // ===============================
@@ -808,7 +861,7 @@ function roundRect(context, x, y, width, height, radius) {
 
 function setupInteractiveEvents(group) {
   const bindEvents = (target) => {
-    // 视线进入：进入预选状态
+    // 视线进入：进入预选，并开始凝视计时
     target.addEventListener("mouseenter", () => {
       if (!hasEnteredScene || controlMode !== "gaze") return;
 
@@ -816,45 +869,131 @@ function setupInteractiveEvents(group) {
 
       updateObjectVisualStates();
       updateSelectionInfo();
+
+      startGazeConfirm(group);
     });
 
-    // 视线离开：取消预选状态
+    // 视线离开：取消预选，并取消凝视计时
     target.addEventListener("mouseleave", () => {
       if (!hasEnteredScene || controlMode !== "gaze") return;
 
       const currentIndex = selectableObjects.findIndex(o => o.el === group);
 
-      // 只有离开的这个物体正好是当前预选物体时，才取消预选
       if (selectedIndex === currentIndex) {
         selectedIndex = -1;
         updateObjectVisualStates();
         updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象进行预选`);
       }
+
+      cancelGazeConfirm(group);
     });
 
-    // 看着物体点击：确认 / 取消
+    // 保留电脑点击测试，但手机眼神模式主要不再依赖点击
     target.addEventListener("click", () => {
       if (!hasEnteredScene || controlMode !== "gaze") return;
 
       selectedIndex = selectableObjects.findIndex(o => o.el === group);
-
       updateObjectVisualStates();
-      handleAButtonClick();
+
+      // 点击不再直接确认，只作为电脑测试时的辅助预选
+      updateSelectionInfo();
     });
 
-    // 手机触摸：确认 / 取消
     target.addEventListener("touchstart", () => {
       if (!hasEnteredScene || controlMode !== "gaze") return;
 
       selectedIndex = selectableObjects.findIndex(o => o.el === group);
-
       updateObjectVisualStates();
-      handleAButtonClick();
+
+      // 手机触屏不再作为确认方式，避免触屏失灵影响流程
+      updateSelectionInfo();
     });
   };
 
   bindEvents(group);
   group.querySelectorAll(".interactive-hitbox").forEach(bindEvents);
+}
+
+// ===============================
+// 眼神凝视确认
+// ===============================
+
+function startGazeConfirm(entity) {
+  if (!entity || controlMode !== "gaze") return;
+
+  // 如果已经在凝视同一个物体，不重复开计时器
+  if (gazeTargetEl === entity) return;
+
+  cancelGazeConfirm();
+
+  gazeTargetEl = entity;
+  gazeStartTime = performance.now();
+
+  const data = entity.objectData;
+  if (!data) return;
+
+  const durationMs = GAZE_CONFIRM_SECONDS * 1000;
+
+  updateGazeProgressInfo(entity, 0);
+
+  gazeProgressTimer = setInterval(() => {
+    if (!gazeTargetEl || gazeTargetEl !== entity) return;
+
+    const elapsed = performance.now() - gazeStartTime;
+    const progress = Math.min(elapsed / durationMs, 1);
+
+    updateGazeProgressInfo(entity, progress);
+  }, 80);
+
+  gazeTimer = setTimeout(() => {
+    if (!gazeTargetEl || gazeTargetEl !== entity) return;
+
+    selectedIndex = selectableObjects.findIndex(o => o.el === entity);
+
+    updateObjectVisualStates();
+    handleAButtonClick();
+
+    // 触发一次后停止计时。
+    // 如果想取消已确认的意象，需要视线移开后再重新看它 3 秒。
+    cancelGazeConfirm();
+  }, durationMs);
+}
+
+function cancelGazeConfirm(entity = null) {
+  if (entity && gazeTargetEl && gazeTargetEl !== entity) return;
+
+  if (gazeTimer) {
+    clearTimeout(gazeTimer);
+    gazeTimer = null;
+  }
+
+  if (gazeProgressTimer) {
+    clearInterval(gazeProgressTimer);
+    gazeProgressTimer = null;
+  }
+
+  gazeTargetEl = null;
+  gazeStartTime = 0;
+}
+
+function updateGazeProgressInfo(entity, progress) {
+  if (!entity || !entity.objectData) return;
+
+  const data = entity.objectData;
+  const percent = Math.round(progress * 100);
+
+  if (data.type === "finish-button") {
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 凝视完成 ${percent}% | 满 ${GAZE_CONFIRM_SECONDS} 秒进入下一关`);
+    return;
+  }
+
+  const isConfirmed = data.id && confirmedSoundIds.has(data.id);
+
+  if (isConfirmed) {
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 凝视取消：${data.label} ${percent}%`);
+  } else {
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 凝视确认：${data.label} ${percent}%`);
+  }
 }
 
 // ===============================
