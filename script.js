@@ -744,13 +744,36 @@ function setPanorama(levelName) {
     sky.setAttribute("id", "panorama-sky");
     sky.setAttribute("radius", "500");
     sky.setAttribute("rotation", "0 -90 0");
-    sky.setAttribute("material", "shader: flat; side: back");
+
     sceneEl.appendChild(sky);
   }
 
+  // 先移除旧 src，避免 VR 模式下旧材质残留
+  sky.removeAttribute("src");
+  sky.removeAttribute("material");
+
+  // 重新设置全景图
   sky.setAttribute("src", panoramas[levelName]);
 
-  sceneEl.object3D.background = null;
+  // 重点：强制材质完全不透明，避免 PNG 透明边缘在 VR 分屏中露出白色背景
+  sky.setAttribute(
+    "material",
+    [
+      "shader: flat",
+      "side: back",
+      "transparent: false",
+      "opacity: 1",
+      "alphaTest: 0",
+      "depthWrite: false",
+      "depthTest: false",
+      "color: #ffffff"
+    ].join("; ")
+  );
+
+  // 场景背景强制设为黑色，避免透明处露出白底
+  if (sceneEl.object3D) {
+    sceneEl.object3D.background = new THREE.Color(0x000000);
+  }
 }
 
 // ===============================

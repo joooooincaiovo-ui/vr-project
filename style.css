@@ -230,3 +230,14 @@ body {
 .a-enter-vr {
   z-index: 30 !important;
 }
+/* 防止 VR 分屏时 canvas 背景露出白色 */
+.a-canvas,
+canvas {
+  background: #000 !important;
+}
+
+/* VR 模式下不要让白雾层参与画面叠加 */
+html.a-fullscreen #fog-overlay,
+body.a-fullscreen #fog-overlay {
+  display: none !important;
+}
