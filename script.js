@@ -91,7 +91,7 @@ const IMAGE_SIZE = 1.35;
 const PRESELECT_SCALE = 1.16;
 
 // 确认描边贴图大小：如果描边看不明显，可以调到 1.12 / 1.18
-const OUTLINE_SCALE = 1.1;
+const OUTLINE_SCALE = 1.0;
 
 // ===============================
 // 眼神凝视确认参数
@@ -611,11 +611,13 @@ function createFloatingObject(item, index) {
       map: selectedTexture,
       transparent: true,
       opacity: 0,
-      alphaTest: 0.08,
+      // 关键：不要 alphaTest 裁切柔和光晕，否则发光会变硬、变粗。
+      alphaTest: 0,
       depthWrite: false,
       depthTest: false,
       side: THREE.FrontSide,
-      toneMapped: false
+      toneMapped: false,
+      premultipliedAlpha: false
     });
 
     const selectedMesh = new THREE.Mesh(selectedGeometry, selectedMaterial);
@@ -1155,17 +1157,17 @@ function createFinishButton() {
     floatOffset: 9
   };
 
-  const ring = document.createElement("a-entity");
+  // 完成按钮：实心圆，避免视线扫到圆环中空处导致凝视中断
+  const ring = document.createElement("a-circle");
   ring.classList.add("interactive-hitbox");
-  ring.setAttribute(
-    "geometry",
-    "primitive: torus; radius: 0.32; radiusTubular: 0.035; segmentsRadial: 16; segmentsTubular: 48"
-  );
+  ring.setAttribute("radius", "0.38");
+  ring.setAttribute("segments", "64");
   ring.setAttribute(
     "material",
-    "color: #ffffff; transparent: true; opacity: 0.9; depthWrite: false"
+    "shader: flat; color: #ffffff; transparent: true; opacity: 0.88; depthWrite: false; depthTest: false; side: double"
   );
-  ring.object3D.renderOrder = 2;
+  ring.setAttribute("position", "0 0 0");
+  ring.object3D.renderOrder = 25;
   group.appendChild(ring);
 
   const label = createTextLabel("完成");
@@ -1635,24 +1637,38 @@ function goToNextLevel() {
 }
 
 function transitionToLevel(levelName) {
+  if (isLevelTransitioning) return;
+
   isLevelTransitioning = true;
 
   const fogOverlay = document.querySelector("#fog-overlay");
 
-  fogOverlay.style.transition = "opacity 0.45s ease";
+  if (!fogOverlay) {
+    setPanorama(levelName);
+    loadLevel(levelName);
+    isLevelTransitioning = false;
+    return;
+  }
+
+  // 关卡切换白色氛围动画，总时长约 3 秒
+  // 1.2s 渐显 + 0.4s 白屏停留并切换 + 1.4s 渐隐
+  fogOverlay.style.display = "block";
+  fogOverlay.style.transition = "opacity 1.2s ease-in-out";
   fogOverlay.style.opacity = "1";
 
   setTimeout(() => {
     setPanorama(levelName);
     loadLevel(levelName);
 
+    fogOverlay.style.transition = "opacity 1.4s ease-in-out";
     fogOverlay.style.opacity = "0";
 
     setTimeout(() => {
       isLevelTransitioning = false;
       fogOverlay.style.transition = "";
-    }, 500);
-  }, 450);
+      fogOverlay.style.display = "";
+    }, 1400);
+  }, 1600);
 }
 
 function showEndingState() {
@@ -1972,13 +1988,13 @@ function updateObjectVisualStates() {
     if (data.selectedImage) {
       if (isConfirmed) {
         setVisualVisible(data.selectedImage, true);
-        setVisualOpacity(data.selectedImage, 1);
+        setVisualOpacity(data.selectedImage, 0.82);
 
-        const breatheScale = 1 + Math.sin(time * 2.4) * 0.025;
+        const breatheScale = 1 + Math.sin(time * 2.4) * 0.018;
         setVisualScale(data.selectedImage, breatheScale, breatheScale, breatheScale);
       } else if (isSelected) {
         setVisualVisible(data.selectedImage, true);
-        setVisualOpacity(data.selectedImage, 0.62);
+        setVisualOpacity(data.selectedImage, 0.48);
         setVisualScale(data.selectedImage, 1, 1, 1);
       } else {
         setVisualVisible(data.selectedImage, false);
