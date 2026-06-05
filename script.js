@@ -280,32 +280,9 @@ window.addEventListener("DOMContentLoaded", () => {
   preloadAssets();
 
   sceneEl.addEventListener("loaded", () => {
-  cameraObject = cameraEl.object3D;
-
-  // 手机 VR 分屏稳定性修复：
-  // 强制每一帧清屏，避免白色残影 / 叠层残留
-  if (sceneEl.renderer) {
-    sceneEl.renderer.autoClear = true;
-    sceneEl.renderer.sortObjects = true;
-    sceneEl.renderer.setClearColor(0x000000, 1);
-  }
-
-  loadPanoramas();
-});
-
-sceneEl.addEventListener("enter-vr", () => {
-  // 进入分屏 VR 时重新清理渲染器状态
-  if (sceneEl.renderer) {
-    sceneEl.renderer.autoClear = true;
-    sceneEl.renderer.sortObjects = true;
-    sceneEl.renderer.setClearColor(0x000000, 1);
-  }
-
-  // 重新设置一次当前全景，避免进入 VR 后材质状态异常
-  setTimeout(() => {
-    setPanorama(currentLevelName);
-  }, 120);
-});
+    cameraObject = cameraEl.object3D;
+    loadPanoramas();
+  });
 
   initLoadingFlow();
   setupGuideButtons();
@@ -348,7 +325,9 @@ vrToggleBtn.addEventListener("click", () => {
 // ===============================
 function createFloatingObject(item, index) {
   const group = document.createElement("a-entity");
-  group.classList.add("interactive");
+
+  // 关键：让 A-Frame 的 raycaster 可以直接检测这个 group 里的 Three.js mesh
+  group.classList.add("interactive", "interactive-hitbox");
 
   group.setAttribute("position", vectorToPositionString(item.position));
 
@@ -362,69 +341,80 @@ function createFloatingObject(item, index) {
     basePosition: item.position.clone(),
     floatOffset: index * 0.8,
     baseScale: 1,
-    confirmed: false
+    confirmed: false,
+    mainImage: null,
+    selectionRing: null,
+    outlineImage: null
   };
 
   // ===============================
-  // 底层：原图
+  // 底层：用 Three.js Mesh 替代 a-image
   // ===============================
-  const mainImage = document.createElement("a-image");
+  const texture = loadStableTexture(item.imageSrc);
 
-if (item.imageSrc) {
-  mainImage.setAttribute("src", `#${item.id}-img`);
-}
+  const geometry = new THREE.PlaneGeometry(IMAGE_SIZE, IMAGE_SIZE);
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    opacity: 0.94,
+    alphaTest: 0.08,
+    depthWrite: false,
+    depthTest: false,
+    side: THREE.FrontSide,
+    toneMapped: false
+  });
 
-mainImage.setAttribute("width", IMAGE_SIZE);
-mainImage.setAttribute("height", IMAGE_SIZE);
+  const mainMesh = new THREE.Mesh(geometry, material);
+  mainMesh.name = `${item.id}-main-mesh`;
+  mainMesh.position.set(0, 0, 0);
+  mainMesh.renderOrder = 15;
+  mainMesh.userData.ownerEntity = group;
 
-mainImage.setAttribute(
-  "material",
-  "shader: flat; transparent: true; opacity: 0.94; depthWrite: false; depthTest: false; alphaTest: 0.08; side: front"
-);
+  group.object3D.add(mainMesh);
+  group.objectData.mainImage = mainMesh;
 
-mainImage.classList.add("interactive-hitbox");
-mainImage.setAttribute("position", "0 0 0");
-
-mainImage.object3D.renderOrder = 15;
-
-stabilizeTextureOnMaterial(mainImage);
-
-group.appendChild(mainImage);
-group.objectData.mainImage = mainImage;
   // ===============================
-  // 上层：selected 白色描边图
-  // 注意：这里不是替换原图，而是叠加在原图上
+  // 眼神控制命中区域：透明 a-plane
+  // 说明：Three.js Mesh 负责显示图片；这个透明平面只负责被 A-Frame 光标射线检测。
+  // 这样电脑端/手机端 gaze cursor 都能稳定触发 mouseenter / mouseleave / click。
   // ===============================
-// ===============================
-// 上层：selected 白色描边图
-// 注意：这里不是替换原图，而是叠加在原图上
-// ===============================
-// ===============================
-// VR稳定版选中提示：不用 selected PNG，改用几何白圈
-// 这样可以避开手机分屏 VR 对透明 PNG 的渲染错误
-// ===============================
-const selectionRing = document.createElement("a-entity");
+  const hitbox = document.createElement("a-plane");
+  hitbox.classList.add("interactive-hitbox");
+  hitbox.setAttribute("width", IMAGE_SIZE * 1.15);
+  hitbox.setAttribute("height", IMAGE_SIZE * 1.15);
+  hitbox.setAttribute("position", "0 0 0.08");
+  hitbox.setAttribute(
+    "material",
+    "shader: flat; color: #ffffff; transparent: true; opacity: 0.001; depthWrite: false; depthTest: false; side: front"
+  );
+  hitbox.setAttribute("visible", true);
+  group.appendChild(hitbox);
+  group.objectData.hitbox = hitbox;
 
-selectionRing.setAttribute(
-  "geometry",
-  "primitive: torus; radius: 0.78; radiusTubular: 0.018; segmentsRadial: 12; segmentsTubular: 64"
-);
+  // ===============================
+  // VR 稳定版选中提示：Three.js RingGeometry
+  // 不再使用 selected PNG，避免手机分屏 VR 透明贴图炸层
+  // ===============================
+  const ringGeometry = new THREE.RingGeometry(0.68, 0.73, 80);
+  const ringMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    side: THREE.FrontSide,
+    toneMapped: false
+  });
 
-selectionRing.setAttribute(
-  "material",
-  "shader: flat; color: #ffffff; transparent: true; opacity: 0; depthWrite: false; depthTest: false; side: front"
-);
+  const selectionRing = new THREE.Mesh(ringGeometry, ringMaterial);
+  selectionRing.name = `${item.id}-selection-ring`;
+  selectionRing.position.set(0, 0, 0.045);
+  selectionRing.visible = false;
+  selectionRing.renderOrder = 25;
 
-selectionRing.setAttribute("position", "0 0 0.04");
-selectionRing.setAttribute("visible", false);
+  group.object3D.add(selectionRing);
+  group.objectData.selectionRing = selectionRing;
 
-selectionRing.object3D.renderOrder = 20;
-
-group.appendChild(selectionRing);
-group.objectData.selectionRing = selectionRing;
-
-// 保险：不再使用旧的 selected 描边 PNG
-group.objectData.outlineImage = null;
   // ===============================
   // 标签
   // ===============================
@@ -445,32 +435,6 @@ group.objectData.outlineImage = null;
   selectableObjects.push(objectRecord);
 
   return group;
-}
-
-function stabilizeTextureOnMaterial(entity) {
-  entity.addEventListener("materialtextureloaded", () => {
-    const mesh = entity.getObject3D("mesh");
-    if (!mesh || !mesh.material || !mesh.material.map) return;
-
-    const texture = mesh.material.map;
-
-    texture.generateMipmaps = false;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.wrapS = THREE.ClampToEdgeWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
-
-    if ("colorSpace" in texture) {
-      texture.colorSpace = THREE.SRGBColorSpace;
-    } else {
-      texture.encoding = THREE.sRGBEncoding;
-    }
-
-    texture.needsUpdate = true;
-
-    mesh.material.premultipliedAlpha = false;
-    mesh.material.needsUpdate = true;
-  });
 }
 
 // ===============================
@@ -615,32 +579,6 @@ function preloadAssets() {
         assetsEl.appendChild(outline);
       }
     });
-  });
-}
-
-function stabilizeTextureOnMaterial(entity) {
-  entity.addEventListener("materialtextureloaded", () => {
-    const mesh = entity.getObject3D("mesh");
-    if (!mesh || !mesh.material || !mesh.material.map) return;
-
-    const texture = mesh.material.map;
-
-    texture.generateMipmaps = false;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.wrapS = THREE.ClampToEdgeWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
-
-    if ("colorSpace" in texture) {
-      texture.colorSpace = THREE.SRGBColorSpace;
-    } else {
-      texture.encoding = THREE.sRGBEncoding;
-    }
-
-    texture.needsUpdate = true;
-
-    mesh.material.premultipliedAlpha = false;
-    mesh.material.needsUpdate = true;
   });
 }
 
@@ -830,31 +768,13 @@ function setPanorama(levelName) {
     sky.setAttribute("id", "panorama-sky");
     sky.setAttribute("radius", "500");
     sky.setAttribute("rotation", "0 -90 0");
+    sky.setAttribute("material", "shader: flat; side: back");
     sceneEl.appendChild(sky);
   }
 
-  sky.removeAttribute("src");
-  sky.removeAttribute("material");
-
   sky.setAttribute("src", panoramas[levelName]);
 
-  // 强制材质不透明，避免 PNG alpha 导致的残影
-  sky.setAttribute(
-    "material",
-    [
-      "shader: flat",
-      "side: back",
-      "transparent: false",
-      "opacity: 1",
-      "depthWrite: false",
-      "depthTest: false"
-    ].join("; ")
-  );
-
-  // 场景背景黑色
-  if (sceneEl.object3D) {
-    sceneEl.object3D.background = new THREE.Color(0x000000);
-  }
+  sceneEl.object3D.background = null;
 }
 
 // ===============================
@@ -874,6 +794,74 @@ function createPositionByAngle(yawDeg, pitchDeg, radius) {
 
 function vectorToPositionString(vector) {
   return `${vector.x} ${vector.y} ${vector.z}`;
+}
+
+
+// ===============================
+// Three.js 贴图 / 显示工具
+// ===============================
+function loadStableTexture(src) {
+  const texture = new THREE.TextureLoader().load(src);
+
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+
+  if ("colorSpace" in texture) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+  } else {
+    texture.encoding = THREE.sRGBEncoding;
+  }
+
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function setVisualOpacity(target, opacity) {
+  if (!target) return;
+
+  // Three.js Mesh
+  if (target.isMesh && target.material) {
+    target.material.opacity = opacity;
+    target.material.transparent = opacity < 1;
+    target.material.needsUpdate = true;
+    return;
+  }
+
+  // A-Frame Entity
+  if (target.setAttribute) {
+    target.setAttribute("material", "opacity", opacity);
+  }
+}
+
+function setVisualVisible(target, visible) {
+  if (!target) return;
+
+  // Three.js Mesh / Object3D
+  if (target.isObject3D || target.isMesh) {
+    target.visible = visible;
+    return;
+  }
+
+  // A-Frame Entity
+  if (target.setAttribute) {
+    target.setAttribute("visible", visible);
+  }
+}
+
+function setVisualScale(target, x, y, z) {
+  if (!target) return;
+
+  if (target.isObject3D || target.isMesh) {
+    target.scale.set(x, y, z);
+    return;
+  }
+
+  if (target.object3D) {
+    target.object3D.scale.set(x, y, z);
+  }
 }
 
 // ===============================
@@ -1112,25 +1100,29 @@ function setupInteractiveEvents(group) {
       cancelGazeConfirm(group);
     });
 
-    // 保留电脑点击测试，但手机眼神模式主要不再依赖点击
+    // 电脑点击测试：看向/点到对象后，点击可直接确认或取消
     target.addEventListener("click", () => {
       if (!hasEnteredScene || controlMode !== "gaze") return;
 
       selectedIndex = selectableObjects.findIndex(o => o.el === group);
       updateObjectVisualStates();
-
-      // 点击不再直接确认，只作为电脑测试时的辅助预选
       updateSelectionInfo();
+
+      // 电脑端调试时，点击等同于凝视满 2 秒后的确认
+      handleAButtonClick();
+      updateObjectVisualStates();
     });
 
+    // 手机触屏辅助：点到对象也可以确认/取消，防止凝视事件在某些浏览器里失灵
     target.addEventListener("touchstart", () => {
       if (!hasEnteredScene || controlMode !== "gaze") return;
 
       selectedIndex = selectableObjects.findIndex(o => o.el === group);
       updateObjectVisualStates();
-
-      // 手机触屏不再作为确认方式，避免触屏失灵影响流程
       updateSelectionInfo();
+
+      handleAButtonClick();
+      updateObjectVisualStates();
     });
   };
 
@@ -1663,18 +1655,10 @@ function updateObjectVisualStates() {
     // 完成按钮
     // ===============================
     if (isFinishButton) {
-      let finishScale = 1;
-
-      if (isSelected) {
-        finishScale = 1.28;
-      }
-
+      const finishScale = isSelected ? 1.28 : 1;
       entity.object3D.scale.set(finishScale, finishScale, finishScale);
 
-      if (data.mainImage) {
-        data.mainImage.setAttribute("material", "opacity", isSelected ? 1 : 0.9);
-      }
-
+      setVisualOpacity(data.mainImage, isSelected ? 1 : 0.9);
       return;
     }
 
@@ -1692,69 +1676,53 @@ function updateObjectVisualStates() {
     entity.object3D.scale.set(scaleMultiplier, scaleMultiplier, scaleMultiplier);
 
     // ===============================
-    // 原图透明度
+    // 原图透明度：兼容 Three.js Mesh / A-Frame Entity
     // ===============================
     if (data.mainImage) {
-      if (isConfirmed) {
-        data.mainImage.setAttribute("material", "opacity", 1);
-      } else if (isSelected) {
-        data.mainImage.setAttribute("material", "opacity", 1);
+      if (isConfirmed || isSelected) {
+        setVisualOpacity(data.mainImage, 1);
       } else {
-        data.mainImage.setAttribute("material", "opacity", 0.92);
+        setVisualOpacity(data.mainImage, 0.92);
       }
     }
 
     // ===============================
-    // 白色描边层
-    // 预选：半透明描边
-    // 确认：完整描边
-    // 普通：隐藏描边
+    // VR 稳定版选中白圈：Three.js Mesh
     // ===============================
-    // ===============================
-// VR稳定版选中白圈
-// ===============================
-if (data.selectionRing) {
-  if (isConfirmed) {
-    data.selectionRing.setAttribute("visible", true);
-    data.selectionRing.setAttribute("material", "opacity", 1);
+    if (data.selectionRing) {
+      if (isConfirmed) {
+        setVisualVisible(data.selectionRing, true);
+        setVisualOpacity(data.selectionRing, 1);
 
-    const breatheScale = 1 + Math.sin(time * 2.4) * 0.04;
-    data.selectionRing.object3D.scale.set(
-      breatheScale,
-      breatheScale,
-      breatheScale
-    );
-  } else if (isSelected) {
-    data.selectionRing.setAttribute("visible", true);
-    data.selectionRing.setAttribute("material", "opacity", 0.65);
-    data.selectionRing.object3D.scale.set(1, 1, 1);
-  } else {
-    data.selectionRing.setAttribute("visible", false);
-    data.selectionRing.setAttribute("material", "opacity", 0);
-    data.selectionRing.object3D.scale.set(1, 1, 1);
-  }
-}
+        const breatheScale = 1 + Math.sin(time * 2.4) * 0.04;
+        setVisualScale(data.selectionRing, breatheScale, breatheScale, breatheScale);
+      } else if (isSelected) {
+        setVisualVisible(data.selectionRing, true);
+        setVisualOpacity(data.selectionRing, 0.65);
+        setVisualScale(data.selectionRing, 1, 1, 1);
+      } else {
+        setVisualVisible(data.selectionRing, false);
+        setVisualOpacity(data.selectionRing, 0);
+        setVisualScale(data.selectionRing, 1, 1, 1);
+      }
+    }
 
-// 保险：如果旧描边图层还残留，强制隐藏
-if (data.outlineImage) {
-  data.outlineImage.setAttribute("visible", false);
-  data.outlineImage.setAttribute("material", "opacity", 0);
-}
+    // 保险：如果旧描边 PNG 图层还残留，强制关闭
+    if (data.outlineImage) {
+      setVisualVisible(data.outlineImage, false);
+      setVisualOpacity(data.outlineImage, 0);
+    }
 
-    // 如果你代码里还残留旧的白色滤镜层，强制关掉
     if (data.highlightImage) {
-      data.highlightImage.setAttribute("visible", false);
+      setVisualVisible(data.highlightImage, false);
     }
 
-    // 如果你代码里还残留旧的白圈层，也强制关掉
     if (data.preselectRing) {
-      data.preselectRing.setAttribute("visible", false);
+      setVisualVisible(data.preselectRing, false);
     }
 
-    // 如果你代码里还残留旧的 solidOutlineImage，也强制关掉
-    // 因为现在统一使用 data.outlineImage
     if (data.solidOutlineImage) {
-      data.solidOutlineImage.setAttribute("visible", false);
+      setVisualVisible(data.solidOutlineImage, false);
     }
   });
 }
