@@ -370,30 +370,24 @@ function createFloatingObject(item, index) {
   // ===============================
   const mainImage = document.createElement("a-image");
 
-// 临时测试：如果是金鱼，就先不加载金鱼图片
-// 目的：确认白色叠层是不是 f1-fish.png 这张透明 PNG 导致的
-if (item.id === "f1-fish") {
-  mainImage.setAttribute(
-    "material",
-    "shader: flat; color: #ffffff; transparent: true; opacity: 0.15; depthWrite: false; depthTest: false; side: double"
-  );
-} else {
-  if (item.imageSrc) {
-    mainImage.setAttribute("src", `#${item.id}-img`);
-  }
-
-  mainImage.setAttribute(
-    "material",
-    "shader: flat; transparent: true; opacity: 0.94; depthWrite: false; depthTest: false; alphaTest: 0.05; side: double"
-  );
+if (item.imageSrc) {
+  mainImage.setAttribute("src", `#${item.id}-img`);
 }
 
 mainImage.setAttribute("width", IMAGE_SIZE);
 mainImage.setAttribute("height", IMAGE_SIZE);
+
+mainImage.setAttribute(
+  "material",
+  "shader: flat; transparent: true; opacity: 0.94; depthWrite: false; depthTest: false; alphaTest: 0.08; side: front"
+);
+
 mainImage.classList.add("interactive-hitbox");
 mainImage.setAttribute("position", "0 0 0");
 
 mainImage.object3D.renderOrder = 15;
+
+stabilizeTextureOnMaterial(mainImage);
 
 group.appendChild(mainImage);
 group.objectData.mainImage = mainImage;
@@ -418,7 +412,7 @@ selectionRing.setAttribute(
 
 selectionRing.setAttribute(
   "material",
-  "shader: flat; color: #ffffff; transparent: true; opacity: 0; depthWrite: false; depthTest: false"
+  "shader: flat; color: #ffffff; transparent: true; opacity: 0; depthWrite: false; depthTest: false; side: front"
 );
 
 selectionRing.setAttribute("position", "0 0 0.04");
@@ -451,6 +445,32 @@ group.objectData.outlineImage = null;
   selectableObjects.push(objectRecord);
 
   return group;
+}
+
+function stabilizeTextureOnMaterial(entity) {
+  entity.addEventListener("materialtextureloaded", () => {
+    const mesh = entity.getObject3D("mesh");
+    if (!mesh || !mesh.material || !mesh.material.map) return;
+
+    const texture = mesh.material.map;
+
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+
+    if ("colorSpace" in texture) {
+      texture.colorSpace = THREE.SRGBColorSpace;
+    } else {
+      texture.encoding = THREE.sRGBEncoding;
+    }
+
+    texture.needsUpdate = true;
+
+    mesh.material.premultipliedAlpha = false;
+    mesh.material.needsUpdate = true;
+  });
 }
 
 // ===============================
@@ -595,6 +615,32 @@ function preloadAssets() {
         assetsEl.appendChild(outline);
       }
     });
+  });
+}
+
+function stabilizeTextureOnMaterial(entity) {
+  entity.addEventListener("materialtextureloaded", () => {
+    const mesh = entity.getObject3D("mesh");
+    if (!mesh || !mesh.material || !mesh.material.map) return;
+
+    const texture = mesh.material.map;
+
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+
+    if ("colorSpace" in texture) {
+      texture.colorSpace = THREE.SRGBColorSpace;
+    } else {
+      texture.encoding = THREE.sRGBEncoding;
+    }
+
+    texture.needsUpdate = true;
+
+    mesh.material.premultipliedAlpha = false;
+    mesh.material.needsUpdate = true;
   });
 }
 
