@@ -367,30 +367,36 @@ function createFloatingObject(item, index) {
   // 上层：selected 白色描边图
   // 注意：这里不是替换原图，而是叠加在原图上
   // ===============================
-  if (item.solidOutlineSrc) {
-    const outlineImage = document.createElement("a-image");
+// ===============================
+// 上层：selected 白色描边图
+// 注意：这里不是替换原图，而是叠加在原图上
+// ===============================
+// ===============================
+// VR稳定版选中提示：不用 selected PNG，改用几何白圈
+// 这样可以避开手机分屏 VR 对透明 PNG 的渲染错误
+// ===============================
+const selectionRing = document.createElement("a-entity");
 
-    outlineImage.setAttribute("src", `#${item.id}-outline`);
-    outlineImage.setAttribute("width", IMAGE_SIZE * OUTLINE_SCALE);
-    outlineImage.setAttribute("height", IMAGE_SIZE * OUTLINE_SCALE);
+selectionRing.setAttribute(
+  "geometry",
+  "primitive: torus; radius: 0.78; radiusTubular: 0.018; segmentsRadial: 12; segmentsTubular: 64"
+);
 
-    // 重点：
-    // 不使用 additive
-    // 不使用 depthTest:false
-    // 只作为普通透明贴图叠加
-    outlineImage.setAttribute(
-      "material",
-      "transparent:true; opacity:0; depthWrite:false; depthTest:true; alphaTest:0.01; side:double"
-    );
+selectionRing.setAttribute(
+  "material",
+  "shader: flat; color: #ffffff; transparent: true; opacity: 0; depthWrite: false; depthTest: false"
+);
 
-    // 稍微往前一点，避免和原图完全重合导致手机端闪烁
-    outlineImage.setAttribute("position", "0 0 0.035");
-    outlineImage.setAttribute("visible", false);
+selectionRing.setAttribute("position", "0 0 0.04");
+selectionRing.setAttribute("visible", false);
 
-    group.appendChild(outlineImage);
-    group.objectData.outlineImage = outlineImage;
-  }
+selectionRing.object3D.renderOrder = 20;
 
+group.appendChild(selectionRing);
+group.objectData.selectionRing = selectionRing;
+
+// 保险：不再使用旧的 selected 描边 PNG
+group.objectData.outlineImage = null;
   // ===============================
   // 标签
   // ===============================
@@ -1624,29 +1630,36 @@ function updateObjectVisualStates() {
     // 确认：完整描边
     // 普通：隐藏描边
     // ===============================
-    if (data.outlineImage) {
-  data.outlineImage.object3D.renderOrder = 10; // 确保漂浮意象描边永远在天空球之上
+    // ===============================
+// VR稳定版选中白圈
+// ===============================
+if (data.selectionRing) {
+  if (isConfirmed) {
+    data.selectionRing.setAttribute("visible", true);
+    data.selectionRing.setAttribute("material", "opacity", 1);
 
-      if (isConfirmed) {
-        data.outlineImage.setAttribute("visible", true);
-        data.outlineImage.setAttribute("material", "opacity", 1);
+    const breatheScale = 1 + Math.sin(time * 2.4) * 0.04;
+    data.selectionRing.object3D.scale.set(
+      breatheScale,
+      breatheScale,
+      breatheScale
+    );
+  } else if (isSelected) {
+    data.selectionRing.setAttribute("visible", true);
+    data.selectionRing.setAttribute("material", "opacity", 0.65);
+    data.selectionRing.object3D.scale.set(1, 1, 1);
+  } else {
+    data.selectionRing.setAttribute("visible", false);
+    data.selectionRing.setAttribute("material", "opacity", 0);
+    data.selectionRing.object3D.scale.set(1, 1, 1);
+  }
+}
 
-        const breatheScale = 1 + Math.sin(time * 2.4) * 0.02;
-        data.outlineImage.object3D.scale.set(
-          breatheScale,
-          breatheScale,
-          breatheScale
-        );
-      } else if (isSelected) {
-        data.outlineImage.setAttribute("visible", true);
-        data.outlineImage.setAttribute("material", "opacity", 0.55);
-        data.outlineImage.object3D.scale.set(1, 1, 1);
-      } else {
-        data.outlineImage.setAttribute("visible", false);
-        data.outlineImage.setAttribute("material", "opacity", 0);
-        data.outlineImage.object3D.scale.set(1, 1, 1);
-      }
-    }
+// 保险：如果旧描边图层还残留，强制隐藏
+if (data.outlineImage) {
+  data.outlineImage.setAttribute("visible", false);
+  data.outlineImage.setAttribute("material", "opacity", 0);
+}
 
     // 如果你代码里还残留旧的白色滤镜层，强制关掉
     if (data.highlightImage) {
