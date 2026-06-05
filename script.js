@@ -293,27 +293,123 @@ window.addEventListener("DOMContentLoaded", () => {
   requestAnimationFrame(updateLoop);
 });
 
+// ===============================
+// 稳定版手机分屏 VR
+// 不再调用 A-Frame enterVR，避免手机分屏白色叠层
+// ===============================
+
+let customSplitMode = false;
+let splitOverlay = null;
+let splitStream = null;
+
 const vrToggleBtn = document.createElement("button");
 vrToggleBtn.id = "vr-toggle-btn";
 vrToggleBtn.innerText = "VR / 3D";
+
 Object.assign(vrToggleBtn.style, {
   position: "fixed",
   bottom: "16px",
   right: "16px",
-  zIndex: "50",
+  zIndex: "80",
   padding: "10px 16px",
   borderRadius: "12px",
-  background: "rgba(255,255,255,0.85)",
+  background: "rgba(255,255,255,0.88)",
   color: "black",
   fontWeight: "bold",
   border: "none"
 });
+
 document.body.appendChild(vrToggleBtn);
 
 vrToggleBtn.addEventListener("click", () => {
-  if (!sceneEl.is("vr-mode")) sceneEl.enterVR();
-  else sceneEl.exitVR();
+  if (customSplitMode) {
+    exitCustomSplitVR();
+  } else {
+    enterCustomSplitVR();
+  }
 });
+
+function enterCustomSplitVR() {
+  if (customSplitMode) return;
+
+  const canvas = document.querySelector("canvas");
+
+  if (!canvas || !canvas.captureStream) {
+    alert("当前浏览器不支持稳定分屏模式，请换 Safari / Chrome 再试。");
+    return;
+  }
+
+  customSplitMode = true;
+
+  // 捕获 A-Frame 普通模式下的正常画面
+  splitStream = canvas.captureStream(60);
+
+  splitOverlay = document.createElement("div");
+  splitOverlay.id = "custom-split-vr-overlay";
+
+  const leftEye = document.createElement("video");
+  const rightEye = document.createElement("video");
+
+  [leftEye, rightEye].forEach((video) => {
+    video.srcObject = splitStream;
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("webkit-playsinline", "true");
+    video.className = "custom-split-eye";
+    video.play().catch(() => {});
+  });
+
+  const exitBtn = document.createElement("button");
+  exitBtn.id = "custom-split-exit-btn";
+  exitBtn.innerText = "退出";
+  exitBtn.addEventListener("click", exitCustomSplitVR);
+
+  splitOverlay.appendChild(leftEye);
+  splitOverlay.appendChild(rightEye);
+  splitOverlay.appendChild(exitBtn);
+  document.body.appendChild(splitOverlay);
+
+  // 请求全屏
+  const docEl = document.documentElement;
+
+  if (docEl.requestFullscreen) {
+    docEl.requestFullscreen().catch(() => {});
+  } else if (docEl.webkitRequestFullscreen) {
+    docEl.webkitRequestFullscreen();
+  }
+
+  vrToggleBtn.style.display = "none";
+
+  // 进入横屏方向，支持则尝试锁定
+  if (screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock("landscape").catch(() => {});
+  }
+}
+
+function exitCustomSplitVR() {
+  customSplitMode = false;
+
+  if (splitOverlay) {
+    splitOverlay.remove();
+    splitOverlay = null;
+  }
+
+  if (splitStream) {
+    splitStream.getTracks().forEach((track) => track.stop());
+    splitStream = null;
+  }
+
+  vrToggleBtn.style.display = "block";
+
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  } else if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  }
+}
+
 
 
 // ===============================
