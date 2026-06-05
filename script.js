@@ -347,22 +347,33 @@ function createFloatingObject(item, index) {
   // ===============================
   const mainImage = document.createElement("a-image");
 
+// 临时测试：如果是金鱼，就先不加载金鱼图片
+// 目的：确认白色叠层是不是 f1-fish.png 这张透明 PNG 导致的
+if (item.id === "f1-fish") {
+  mainImage.setAttribute(
+    "material",
+    "shader: flat; color: #ffffff; transparent: true; opacity: 0.15; depthWrite: false; depthTest: false; side: double"
+  );
+} else {
   if (item.imageSrc) {
     mainImage.setAttribute("src", `#${item.id}-img`);
   }
 
-  mainImage.setAttribute("width", IMAGE_SIZE);
-  mainImage.setAttribute("height", IMAGE_SIZE);
   mainImage.setAttribute(
     "material",
-    "transparent:true; opacity:0.94; depthWrite:false; depthTest:true; alphaTest:0.01; side:double"
+    "shader: flat; transparent: true; opacity: 0.94; depthWrite: false; depthTest: false; alphaTest: 0.05; side: double"
   );
-  mainImage.classList.add("interactive-hitbox");
-  mainImage.setAttribute("position", "0 0 0");
+}
 
-  group.appendChild(mainImage);
-  group.objectData.mainImage = mainImage;
+mainImage.setAttribute("width", IMAGE_SIZE);
+mainImage.setAttribute("height", IMAGE_SIZE);
+mainImage.classList.add("interactive-hitbox");
+mainImage.setAttribute("position", "0 0 0");
 
+mainImage.object3D.renderOrder = 15;
+
+group.appendChild(mainImage);
+group.objectData.mainImage = mainImage;
   // ===============================
   // 上层：selected 白色描边图
   // 注意：这里不是替换原图，而是叠加在原图上
