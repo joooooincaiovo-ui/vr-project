@@ -347,27 +347,35 @@ function enterCustomSplitVR() {
   splitOverlay = document.createElement("div");
   splitOverlay.id = "custom-split-vr-overlay";
 
-  const leftEye = document.createElement("video");
-  const rightEye = document.createElement("video");
+const leftEyeWrap = document.createElement("div");
+const rightEyeWrap = document.createElement("div");
 
-  [leftEye, rightEye].forEach((video) => {
-    video.srcObject = splitStream;
-    video.autoplay = true;
-    video.muted = true;
-    video.playsInline = true;
-    video.setAttribute("playsinline", "true");
-    video.setAttribute("webkit-playsinline", "true");
-    video.className = "custom-split-eye";
-    video.play().catch(() => {});
-  });
+leftEyeWrap.className = "custom-split-eye-wrap left-eye";
+rightEyeWrap.className = "custom-split-eye-wrap right-eye";
 
-  const exitBtn = document.createElement("button");
-  exitBtn.id = "custom-split-exit-btn";
-  exitBtn.innerText = "退出";
-  exitBtn.addEventListener("click", exitCustomSplitVR);
+const leftEye = document.createElement("video");
+const rightEye = document.createElement("video");
 
-  splitOverlay.appendChild(leftEye);
-  splitOverlay.appendChild(rightEye);
+[leftEye, rightEye].forEach((video) => {
+  video.srcObject = splitStream;
+  video.autoplay = true;
+  video.muted = true;
+  video.playsInline = true;
+  video.setAttribute("playsinline", "true");
+  video.setAttribute("webkit-playsinline", "true");
+  video.className = "custom-split-eye-video";
+  video.play().catch(() => {});
+});
+
+leftEyeWrap.appendChild(leftEye);
+rightEyeWrap.appendChild(rightEye);
+
+const centerDivider = document.createElement("div");
+centerDivider.id = "custom-split-center-divider";
+
+splitOverlay.appendChild(leftEyeWrap);
+splitOverlay.appendChild(rightEyeWrap);
+splitOverlay.appendChild(centerDivider);
   splitOverlay.appendChild(exitBtn);
   document.body.appendChild(splitOverlay);
 
@@ -380,7 +388,7 @@ function enterCustomSplitVR() {
     docEl.webkitRequestFullscreen();
   }
 
-  vrToggleBtn.style.display = "none";
+  vrToggleBtn.classList.add("hidden-in-split");
 
   // 进入横屏方向，支持则尝试锁定
   if (screen.orientation && screen.orientation.lock) {
@@ -401,7 +409,7 @@ function exitCustomSplitVR() {
     splitStream = null;
   }
 
-  vrToggleBtn.style.display = "block";
+  vrToggleBtn.classList.remove("hidden-in-split");
 
   if (document.fullscreenElement && document.exitFullscreen) {
     document.exitFullscreen().catch(() => {});
@@ -468,6 +476,102 @@ function createFloatingObject(item, index) {
 
   group.object3D.add(mainMesh);
   group.objectData.mainImage = mainMesh;
+
+  // ===============================
+// selected image：用 Three.js Mesh 渲染，替代白圈
+// ===============================
+if (item.solidOutlineSrc) {
+  const selectedTexture = new THREE.TextureLoader().load(item.solidOutlineSrc);
+
+  selectedTexture.generateMipmaps = false;
+  selectedTexture.minFilter = THREE.LinearFilter;
+  selectedTexture.magFilter = THREE.LinearFilter;
+  selectedTexture.wrapS = THREE.ClampToEdgeWrapping;
+  selectedTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+  if ("colorSpace" in selectedTexture) {
+    selectedTexture.colorSpace = THREE.SRGBColorSpace;
+  } else {
+    selectedTexture.encoding = THREE.sRGBEncoding;
+  }
+
+  const selectedGeometry = new THREE.PlaneGeometry(
+    IMAGE_SIZE * OUTLINE_SCALE,
+    IMAGE_SIZE * OUTLINE_SCALE
+  );
+
+  const selectedMaterial = new THREE.MeshBasicMaterial({
+    map: selectedTexture,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    side: THREE.FrontSide
+  });
+
+  const selectedMesh = new THREE.Mesh(selectedGeometry, selectedMaterial);
+
+  selectedMesh.position.z = 0.045;
+  selectedMesh.renderOrder = 30;
+  selectedMesh.visible = false;
+
+  group.object3D.add(selectedMesh);
+
+  group.objectData.selectedImage = selectedMesh;
+}
+
+// 保险：如果旧白圈还在，先记录但后面不显示
+if (group.objectData.selectionRing) {
+  group.objectData.selectionRing.visible = false;
+}
+
+  // ===============================
+// selected image：用 Three.js Mesh 渲染，替代白圈
+// ===============================
+if (item.solidOutlineSrc) {
+  const selectedTexture = new THREE.TextureLoader().load(item.solidOutlineSrc);
+
+  selectedTexture.generateMipmaps = false;
+  selectedTexture.minFilter = THREE.LinearFilter;
+  selectedTexture.magFilter = THREE.LinearFilter;
+  selectedTexture.wrapS = THREE.ClampToEdgeWrapping;
+  selectedTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+  if ("colorSpace" in selectedTexture) {
+    selectedTexture.colorSpace = THREE.SRGBColorSpace;
+  } else {
+    selectedTexture.encoding = THREE.sRGBEncoding;
+  }
+
+  const selectedGeometry = new THREE.PlaneGeometry(
+    IMAGE_SIZE * OUTLINE_SCALE,
+    IMAGE_SIZE * OUTLINE_SCALE
+  );
+
+  const selectedMaterial = new THREE.MeshBasicMaterial({
+    map: selectedTexture,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    side: THREE.FrontSide
+  });
+
+  const selectedMesh = new THREE.Mesh(selectedGeometry, selectedMaterial);
+
+  selectedMesh.position.z = 0.045;
+  selectedMesh.renderOrder = 30;
+  selectedMesh.visible = false;
+
+  group.object3D.add(selectedMesh);
+
+  group.objectData.selectedImage = selectedMesh;
+}
+
+// 保险：如果旧白圈还在，先记录但后面不显示
+if (group.objectData.selectionRing) {
+  group.objectData.selectionRing.visible = false;
+}
 
   // ===============================
   // 眼神控制命中区域：透明 a-plane
@@ -1785,23 +1889,42 @@ function updateObjectVisualStates() {
     // ===============================
     // VR 稳定版选中白圈：Three.js Mesh
     // ===============================
-    if (data.selectionRing) {
-      if (isConfirmed) {
-        setVisualVisible(data.selectionRing, true);
-        setVisualOpacity(data.selectionRing, 1);
+    // ===============================
+// selected image 选中 / 确认状态
+// ===============================
+if (data.selectedImage) {
+  if (isConfirmed) {
+    data.selectedImage.visible = true;
+    data.selectedImage.material.opacity = 1;
 
-        const breatheScale = 1 + Math.sin(time * 2.4) * 0.04;
-        setVisualScale(data.selectionRing, breatheScale, breatheScale, breatheScale);
-      } else if (isSelected) {
-        setVisualVisible(data.selectionRing, true);
-        setVisualOpacity(data.selectionRing, 0.65);
-        setVisualScale(data.selectionRing, 1, 1, 1);
-      } else {
-        setVisualVisible(data.selectionRing, false);
-        setVisualOpacity(data.selectionRing, 0);
-        setVisualScale(data.selectionRing, 1, 1, 1);
-      }
-    }
+    const breatheScale = 1 + Math.sin(time * 2.4) * 0.025;
+    data.selectedImage.scale.set(
+      breatheScale,
+      breatheScale,
+      breatheScale
+    );
+  } else if (isSelected) {
+    data.selectedImage.visible = true;
+    data.selectedImage.material.opacity = 0.62;
+    data.selectedImage.scale.set(1, 1, 1);
+  } else {
+    data.selectedImage.visible = false;
+    data.selectedImage.material.opacity = 0;
+    data.selectedImage.scale.set(1, 1, 1);
+  }
+
+  data.selectedImage.material.needsUpdate = true;
+}
+
+// 彻底隐藏旧白圈
+if (data.selectionRing) {
+  data.selectionRing.visible = false;
+
+  if (data.selectionRing.material) {
+    data.selectionRing.material.opacity = 0;
+    data.selectionRing.material.needsUpdate = true;
+  }
+}
 
     // 保险：如果旧描边 PNG 图层还残留，强制关闭
     if (data.outlineImage) {
