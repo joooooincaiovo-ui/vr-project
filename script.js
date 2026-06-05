@@ -1,3 +1,8 @@
+// =====================================================
+// VR Project - 稳定自制分屏 + Three.js Mesh 意象 + 手柄修复版
+// 直接复制本文件全部内容，覆盖原 script.js
+// =====================================================
+
 // ===============================
 // 手机访问提示隐藏导航栏
 // ===============================
@@ -281,6 +286,14 @@ window.addEventListener("DOMContentLoaded", () => {
 
   sceneEl.addEventListener("loaded", () => {
     cameraObject = cameraEl.object3D;
+
+    // 稳定普通渲染：我们不再调用 A-Frame 内置 enterVR，避免手机分屏白色叠层
+    if (sceneEl.renderer) {
+      sceneEl.renderer.autoClear = true;
+      sceneEl.renderer.sortObjects = true;
+      sceneEl.renderer.setClearColor(0x000000, 1);
+    }
+
     loadPanoramas();
   });
 
@@ -295,12 +308,15 @@ window.addEventListener("DOMContentLoaded", () => {
 
 // ===============================
 // 稳定版手机分屏 VR
-// 不再调用 A-Frame enterVR，避免手机分屏白色叠层
+// 关键：不调用 A-Frame 的 sceneEl.enterVR()，避免手机分屏白色叠层。
+// 这里复制普通 canvas 画面为左右两屏，流程和手柄输入仍然照常运行。
 // ===============================
 
 let customSplitMode = false;
 let splitOverlay = null;
 let splitStream = null;
+
+injectCustomSplitVRStyles();
 
 const vrToggleBtn = document.createElement("button");
 vrToggleBtn.id = "vr-toggle-btn";
@@ -341,47 +357,56 @@ function enterCustomSplitVR() {
 
   customSplitMode = true;
 
-  // 捕获 A-Frame 普通模式下的正常画面
+  // 进入分屏后，如果有手柄，就自动切回手柄模式。
+  // 这样即使加载页最初没有检测到手柄，后面连接手柄也能继续用。
+  const gamepad = findConnectedGamepad();
+  if (gamepad) {
+    gamepadIndex = gamepad.index;
+    setControlMode("gamepad");
+  }
+
   splitStream = canvas.captureStream(60);
 
   splitOverlay = document.createElement("div");
   splitOverlay.id = "custom-split-vr-overlay";
 
-const leftEyeWrap = document.createElement("div");
-const rightEyeWrap = document.createElement("div");
+  const leftEyeWrap = document.createElement("div");
+  const rightEyeWrap = document.createElement("div");
+  leftEyeWrap.className = "custom-split-eye-wrap left-eye";
+  rightEyeWrap.className = "custom-split-eye-wrap right-eye";
 
-leftEyeWrap.className = "custom-split-eye-wrap left-eye";
-rightEyeWrap.className = "custom-split-eye-wrap right-eye";
+  const leftEye = document.createElement("video");
+  const rightEye = document.createElement("video");
 
-const leftEye = document.createElement("video");
-const rightEye = document.createElement("video");
+  [leftEye, rightEye].forEach((video) => {
+    video.srcObject = splitStream;
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("webkit-playsinline", "true");
+    video.className = "custom-split-eye-video";
+    video.play().catch(() => {});
+  });
 
-[leftEye, rightEye].forEach((video) => {
-  video.srcObject = splitStream;
-  video.autoplay = true;
-  video.muted = true;
-  video.playsInline = true;
-  video.setAttribute("playsinline", "true");
-  video.setAttribute("webkit-playsinline", "true");
-  video.className = "custom-split-eye-video";
-  video.play().catch(() => {});
-});
+  leftEyeWrap.appendChild(leftEye);
+  rightEyeWrap.appendChild(rightEye);
 
-leftEyeWrap.appendChild(leftEye);
-rightEyeWrap.appendChild(rightEye);
+  const centerDivider = document.createElement("div");
+  centerDivider.id = "custom-split-center-divider";
 
-const centerDivider = document.createElement("div");
-centerDivider.id = "custom-split-center-divider";
+  const exitBtn = document.createElement("button");
+  exitBtn.id = "custom-split-exit-btn";
+  exitBtn.innerText = "退出";
+  exitBtn.addEventListener("click", exitCustomSplitVR);
 
-splitOverlay.appendChild(leftEyeWrap);
-splitOverlay.appendChild(rightEyeWrap);
-splitOverlay.appendChild(centerDivider);
+  splitOverlay.appendChild(leftEyeWrap);
+  splitOverlay.appendChild(rightEyeWrap);
+  splitOverlay.appendChild(centerDivider);
   splitOverlay.appendChild(exitBtn);
   document.body.appendChild(splitOverlay);
 
-  // 请求全屏
   const docEl = document.documentElement;
-
   if (docEl.requestFullscreen) {
     docEl.requestFullscreen().catch(() => {});
   } else if (docEl.webkitRequestFullscreen) {
@@ -390,7 +415,6 @@ splitOverlay.appendChild(centerDivider);
 
   vrToggleBtn.classList.add("hidden-in-split");
 
-  // 进入横屏方向，支持则尝试锁定
   if (screen.orientation && screen.orientation.lock) {
     screen.orientation.lock("landscape").catch(() => {});
   }
@@ -418,6 +442,80 @@ function exitCustomSplitVR() {
   }
 }
 
+function injectCustomSplitVRStyles() {
+  if (document.querySelector("#custom-split-vr-style")) return;
+
+  const style = document.createElement("style");
+  style.id = "custom-split-vr-style";
+  style.textContent = `
+    .a-enter-vr { display: none !important; }
+
+    #custom-split-vr-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: row;
+      background: #000;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .custom-split-eye-wrap {
+      position: relative;
+      width: 50vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .custom-split-eye-video {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 104vw;
+      height: 104vh;
+      object-fit: cover;
+      transform: translate(-50%, -50%) scale(1.02);
+      transform-origin: center center;
+      background: #000;
+    }
+
+    .left-eye .custom-split-eye-video { object-position: 52% 50%; }
+    .right-eye .custom-split-eye-video { object-position: 48% 50%; }
+
+    #custom-split-center-divider {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      width: 2px;
+      height: 100vh;
+      transform: translateX(-1px);
+      background: rgba(0, 0, 0, 0.96);
+      z-index: 10001;
+      pointer-events: none;
+    }
+
+    #custom-split-exit-btn {
+      position: fixed;
+      top: 12px;
+      right: 14px;
+      z-index: 10002;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      color: #000;
+      font-size: 12px;
+      font-weight: bold;
+      opacity: 0.72;
+    }
+
+    #vr-toggle-btn.hidden-in-split { display: none !important; }
+  `;
+
+  document.head.appendChild(style);
+}
 
 
 // ===============================
@@ -447,6 +545,7 @@ function createFloatingObject(item, index) {
     baseScale: 1,
     confirmed: false,
     mainImage: null,
+    selectedImage: null,
     selectionRing: null,
     outlineImage: null
   };
@@ -478,102 +577,6 @@ function createFloatingObject(item, index) {
   group.objectData.mainImage = mainMesh;
 
   // ===============================
-// selected image：用 Three.js Mesh 渲染，替代白圈
-// ===============================
-if (item.solidOutlineSrc) {
-  const selectedTexture = new THREE.TextureLoader().load(item.solidOutlineSrc);
-
-  selectedTexture.generateMipmaps = false;
-  selectedTexture.minFilter = THREE.LinearFilter;
-  selectedTexture.magFilter = THREE.LinearFilter;
-  selectedTexture.wrapS = THREE.ClampToEdgeWrapping;
-  selectedTexture.wrapT = THREE.ClampToEdgeWrapping;
-
-  if ("colorSpace" in selectedTexture) {
-    selectedTexture.colorSpace = THREE.SRGBColorSpace;
-  } else {
-    selectedTexture.encoding = THREE.sRGBEncoding;
-  }
-
-  const selectedGeometry = new THREE.PlaneGeometry(
-    IMAGE_SIZE * OUTLINE_SCALE,
-    IMAGE_SIZE * OUTLINE_SCALE
-  );
-
-  const selectedMaterial = new THREE.MeshBasicMaterial({
-    map: selectedTexture,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: false,
-    side: THREE.FrontSide
-  });
-
-  const selectedMesh = new THREE.Mesh(selectedGeometry, selectedMaterial);
-
-  selectedMesh.position.z = 0.045;
-  selectedMesh.renderOrder = 30;
-  selectedMesh.visible = false;
-
-  group.object3D.add(selectedMesh);
-
-  group.objectData.selectedImage = selectedMesh;
-}
-
-// 保险：如果旧白圈还在，先记录但后面不显示
-if (group.objectData.selectionRing) {
-  group.objectData.selectionRing.visible = false;
-}
-
-  // ===============================
-// selected image：用 Three.js Mesh 渲染，替代白圈
-// ===============================
-if (item.solidOutlineSrc) {
-  const selectedTexture = new THREE.TextureLoader().load(item.solidOutlineSrc);
-
-  selectedTexture.generateMipmaps = false;
-  selectedTexture.minFilter = THREE.LinearFilter;
-  selectedTexture.magFilter = THREE.LinearFilter;
-  selectedTexture.wrapS = THREE.ClampToEdgeWrapping;
-  selectedTexture.wrapT = THREE.ClampToEdgeWrapping;
-
-  if ("colorSpace" in selectedTexture) {
-    selectedTexture.colorSpace = THREE.SRGBColorSpace;
-  } else {
-    selectedTexture.encoding = THREE.sRGBEncoding;
-  }
-
-  const selectedGeometry = new THREE.PlaneGeometry(
-    IMAGE_SIZE * OUTLINE_SCALE,
-    IMAGE_SIZE * OUTLINE_SCALE
-  );
-
-  const selectedMaterial = new THREE.MeshBasicMaterial({
-    map: selectedTexture,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: false,
-    side: THREE.FrontSide
-  });
-
-  const selectedMesh = new THREE.Mesh(selectedGeometry, selectedMaterial);
-
-  selectedMesh.position.z = 0.045;
-  selectedMesh.renderOrder = 30;
-  selectedMesh.visible = false;
-
-  group.object3D.add(selectedMesh);
-
-  group.objectData.selectedImage = selectedMesh;
-}
-
-// 保险：如果旧白圈还在，先记录但后面不显示
-if (group.objectData.selectionRing) {
-  group.objectData.selectionRing.visible = false;
-}
-
-  // ===============================
   // 眼神控制命中区域：透明 a-plane
   // 说明：Three.js Mesh 负责显示图片；这个透明平面只负责被 A-Frame 光标射线检测。
   // 这样电脑端/手机端 gaze cursor 都能稳定触发 mouseenter / mouseleave / click。
@@ -592,28 +595,38 @@ if (group.objectData.selectionRing) {
   group.objectData.hitbox = hitbox;
 
   // ===============================
-  // VR 稳定版选中提示：Three.js RingGeometry
-  // 不再使用 selected PNG，避免手机分屏 VR 透明贴图炸层
+  // 选中/确认效果：使用你自己的 selected images
+  // 注意：这里用 Three.js Mesh 渲染 selected PNG，不再使用 A-Frame <a-image>，
+  // 所以不会触发 A-Frame 内置分屏的白色叠层问题。
   // ===============================
-  const ringGeometry = new THREE.RingGeometry(0.68, 0.73, 80);
-  const ringMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: false,
-    side: THREE.FrontSide,
-    toneMapped: false
-  });
+  if (item.solidOutlineSrc) {
+    const selectedTexture = loadStableTexture(item.solidOutlineSrc);
 
-  const selectionRing = new THREE.Mesh(ringGeometry, ringMaterial);
-  selectionRing.name = `${item.id}-selection-ring`;
-  selectionRing.position.set(0, 0, 0.045);
-  selectionRing.visible = false;
-  selectionRing.renderOrder = 25;
+    const selectedGeometry = new THREE.PlaneGeometry(
+      IMAGE_SIZE * OUTLINE_SCALE,
+      IMAGE_SIZE * OUTLINE_SCALE
+    );
 
-  group.object3D.add(selectionRing);
-  group.objectData.selectionRing = selectionRing;
+    const selectedMaterial = new THREE.MeshBasicMaterial({
+      map: selectedTexture,
+      transparent: true,
+      opacity: 0,
+      alphaTest: 0.08,
+      depthWrite: false,
+      depthTest: false,
+      side: THREE.FrontSide,
+      toneMapped: false
+    });
+
+    const selectedMesh = new THREE.Mesh(selectedGeometry, selectedMaterial);
+    selectedMesh.name = `${item.id}-selected-image`;
+    selectedMesh.position.set(0, 0, 0.045);
+    selectedMesh.visible = false;
+    selectedMesh.renderOrder = 30;
+
+    group.object3D.add(selectedMesh);
+    group.objectData.selectedImage = selectedMesh;
+  }
 
   // ===============================
   // 标签
@@ -1654,6 +1667,51 @@ function showEndingState() {
   console.log("每关记录的声音：", playedSoundRecords);
 }
 
+
+function setControlMode(mode) {
+  controlMode = mode;
+
+  const gazeCursor = document.querySelector("#gaze-cursor");
+
+  if (gazeCursor) {
+    if (mode === "gaze") {
+      gazeCursor.classList.remove("hidden");
+      gazeCursor.setAttribute("visible", true);
+    } else {
+      gazeCursor.classList.add("hidden");
+      gazeCursor.setAttribute("visible", false);
+    }
+  }
+
+  if (hasEnteredScene) {
+    if (mode === "gamepad") {
+      if (selectedIndex < 0 || getSelectedObject()?.type === "finish-button") {
+        selectedIndex = 0;
+      }
+      updateObjectVisualStates();
+      updateInfo("手柄模式：左摇杆切换 / 向下选择完成 / A确认");
+    } else {
+      selectedIndex = -1;
+      updateObjectVisualStates();
+      updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象，凝视 ${GAZE_CONFIRM_SECONDS} 秒确认`);
+    }
+  }
+}
+
+function isMeaningfulGamepadInput(gamepad) {
+  if (!gamepad) return false;
+
+  const leftStickX = gamepad.axes[0] || 0;
+  const leftStickY = gamepad.axes[1] || 0;
+  const aButtonPressed = gamepad.buttons[0]?.pressed || false;
+
+  return (
+    aButtonPressed ||
+    Math.abs(leftStickX) > 0.45 ||
+    Math.abs(leftStickY) > 0.45
+  );
+}
+
 // ===============================
 // 手柄
 // ===============================
@@ -1664,6 +1722,8 @@ function setupGamepadEvents() {
 
     if (!hasEnteredScene) {
       controlMode = "gamepad";
+    } else {
+      setControlMode("gamepad");
     }
 
     console.log("手柄已连接：", event.gamepad);
@@ -1696,8 +1756,16 @@ function checkGamepadInput() {
   const leftStickX = gamepad.axes[0] || 0;
   const leftStickY = gamepad.axes[1] || 0;
 
+  // 有些手机浏览器不会及时触发 gamepadconnected，
+  // 所以每帧只要发现手柄，就补上 gamepadIndex。
+  if (gamepadIndex === null || gamepadIndex === undefined) {
+    gamepadIndex = gamepad.index;
+  }
+
+  // 教学页 / 未进入场景时：按 A 直接进入手柄模式
   if (!hasEnteredScene) {
-    if (aButtonPressed && !previousAButtonPressed && controlMode === "gamepad") {
+    if (aButtonPressed && !previousAButtonPressed) {
+      setControlMode("gamepad");
       enterScene();
     }
 
@@ -1705,12 +1773,22 @@ function checkGamepadInput() {
     return;
   }
 
-  if (controlMode !== "gamepad") return;
+  // 已进入场景后：只要检测到手柄输入，就自动切到手柄模式。
+  // 这一步是为了修复自制分屏后，手机端手柄连接但仍停在 gaze 模式的问题。
+  if (controlMode !== "gamepad" && isMeaningfulGamepadInput(gamepad)) {
+    setControlMode("gamepad");
+  }
+
+  if (controlMode !== "gamepad") {
+    previousAButtonPressed = aButtonPressed;
+    return;
+  }
 
   const downStickPressed = leftStickY > 0.65;
 
   if (downStickPressed && !previousDownStickPressed) {
     selectFinishButton();
+    updateObjectVisualStates();
   }
 
   previousDownStickPressed = downStickPressed;
@@ -1733,6 +1811,7 @@ function checkGamepadInput() {
     )
   ) {
     moveSelection(currentStickDirection);
+    updateObjectVisualStates();
     lastStickMoveTime = now;
   }
 
@@ -1740,6 +1819,7 @@ function checkGamepadInput() {
 
   if (aButtonPressed && !previousAButtonPressed) {
     handleAButtonClick();
+    updateObjectVisualStates();
   }
 
   previousAButtonPressed = aButtonPressed;
@@ -1887,44 +1967,31 @@ function updateObjectVisualStates() {
     }
 
     // ===============================
-    // VR 稳定版选中白圈：Three.js Mesh
+    // selected image 选中 / 确认状态
     // ===============================
-    // ===============================
-// selected image 选中 / 确认状态
-// ===============================
-if (data.selectedImage) {
-  if (isConfirmed) {
-    data.selectedImage.visible = true;
-    data.selectedImage.material.opacity = 1;
+    if (data.selectedImage) {
+      if (isConfirmed) {
+        setVisualVisible(data.selectedImage, true);
+        setVisualOpacity(data.selectedImage, 1);
 
-    const breatheScale = 1 + Math.sin(time * 2.4) * 0.025;
-    data.selectedImage.scale.set(
-      breatheScale,
-      breatheScale,
-      breatheScale
-    );
-  } else if (isSelected) {
-    data.selectedImage.visible = true;
-    data.selectedImage.material.opacity = 0.62;
-    data.selectedImage.scale.set(1, 1, 1);
-  } else {
-    data.selectedImage.visible = false;
-    data.selectedImage.material.opacity = 0;
-    data.selectedImage.scale.set(1, 1, 1);
-  }
+        const breatheScale = 1 + Math.sin(time * 2.4) * 0.025;
+        setVisualScale(data.selectedImage, breatheScale, breatheScale, breatheScale);
+      } else if (isSelected) {
+        setVisualVisible(data.selectedImage, true);
+        setVisualOpacity(data.selectedImage, 0.62);
+        setVisualScale(data.selectedImage, 1, 1, 1);
+      } else {
+        setVisualVisible(data.selectedImage, false);
+        setVisualOpacity(data.selectedImage, 0);
+        setVisualScale(data.selectedImage, 1, 1, 1);
+      }
+    }
 
-  data.selectedImage.material.needsUpdate = true;
-}
-
-// 彻底隐藏旧白圈
-if (data.selectionRing) {
-  data.selectionRing.visible = false;
-
-  if (data.selectionRing.material) {
-    data.selectionRing.material.opacity = 0;
-    data.selectionRing.material.needsUpdate = true;
-  }
-}
+    // 彻底隐藏旧白圈
+    if (data.selectionRing) {
+      setVisualVisible(data.selectionRing, false);
+      setVisualOpacity(data.selectionRing, 0);
+    }
 
     // 保险：如果旧描边 PNG 图层还残留，强制关闭
     if (data.outlineImage) {
