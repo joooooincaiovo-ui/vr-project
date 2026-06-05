@@ -280,9 +280,32 @@ window.addEventListener("DOMContentLoaded", () => {
   preloadAssets();
 
   sceneEl.addEventListener("loaded", () => {
-    cameraObject = cameraEl.object3D;
-    loadPanoramas();
-  });
+  cameraObject = cameraEl.object3D;
+
+  // 手机 VR 分屏稳定性修复：
+  // 强制每一帧清屏，避免白色残影 / 叠层残留
+  if (sceneEl.renderer) {
+    sceneEl.renderer.autoClear = true;
+    sceneEl.renderer.sortObjects = true;
+    sceneEl.renderer.setClearColor(0x000000, 1);
+  }
+
+  loadPanoramas();
+});
+
+sceneEl.addEventListener("enter-vr", () => {
+  // 进入分屏 VR 时重新清理渲染器状态
+  if (sceneEl.renderer) {
+    sceneEl.renderer.autoClear = true;
+    sceneEl.renderer.sortObjects = true;
+    sceneEl.renderer.setClearColor(0x000000, 1);
+  }
+
+  // 重新设置一次当前全景，避免进入 VR 后材质状态异常
+  setTimeout(() => {
+    setPanorama(currentLevelName);
+  }, 120);
+});
 
   initLoadingFlow();
   setupGuideButtons();
