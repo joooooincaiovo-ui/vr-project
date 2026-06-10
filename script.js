@@ -1,5 +1,5 @@
 // =====================================================
-// VR Project - 稳定自制分屏 + Three.js Mesh 意象 + 手柄修复版
+// VR Project - 稳定自制分屏 + Three.js Mesh 意象 + 第0关VR教学版
 // 直接复制本文件全部内容，覆盖原 script.js
 // =====================================================
 
@@ -73,6 +73,7 @@ const playedSoundRecords = {
 };
 
 const levelDisplayNames = {
+  guide: "教学页",
   floor1: "F1 一楼走廊",
   floor2: "F2 室外空地",
   floor3: "F3 二楼中庭"
@@ -113,6 +114,51 @@ let gazeTargetEl = null;
 let gazeTimer = null;
 let gazeProgressTimer = null;
 let gazeStartTime = 0;
+
+
+// ===============================
+// VR 黑色教学空间参数
+// ===============================
+
+const GUIDE_IMAGES = {
+  gamepad: "./assets/ui/controller-guide-vr.png",
+  gaze: "./assets/ui/gaze-guide-vr.png"
+};
+
+const GUIDE_GAZE_SECONDS = 3;
+
+// 教学图尺寸：现在比上一版约放大 2 倍，可继续调
+const GUIDE_PANEL_WIDTH = 5.4;
+const GUIDE_PANEL_HEIGHT = 4.0;
+
+// 两张教学图的位置：左斜前 / 右斜前
+const GUIDE_PANEL_X = 3.05;
+const GUIDE_PANEL_Z = -4.1;
+const GUIDE_PANEL_Y = 0.35;
+const GUIDE_PANEL_YAW = 18;
+
+let guideRoot = null;
+let guideControllerPlane = null;
+let guideGazePlane = null;
+let guideEnterButton = null;
+let guideProgressCircle = null;
+let guideGazeTimer = null;
+let guideGazeProgressTimer = null;
+let guideGazeStartTime = 0;
+let isGuideVisible = false;
+let isGuideEnteringGame = false;
+
+const GUIDE_OK_X = 0;
+const GUIDE_OK_Y = -1.68;
+const GUIDE_OK_Z = 0.16;
+const GUIDE_OK_WIDTH = 2.6;
+const GUIDE_OK_HEIGHT = 0.9;
+
+let guideGazeTarget = null;
+const guideOkRaycastObjects = [];
+const guideRaycaster = new THREE.Raycaster();
+const guideRayOrigin = new THREE.Vector3();
+const guideRayDirection = new THREE.Vector3();
 
 // ===============================
 // 三关数据
@@ -277,17 +323,42 @@ const levelData = {
 // 初始化
 // ===============================
 
-window.addEventListener("DOMContentLoaded", () => {
+function bootProject() {
+  // 防止重复初始化
+  if (window.__vrProjectBooted) return;
+  window.__vrProjectBooted = true;
+
   sceneEl = document.querySelector("#vr-scene");
   levelRoot = document.querySelector("#level-root");
   cameraEl = document.querySelector("#main-camera");
+
+  if (!sceneEl || !levelRoot || !cameraEl) {
+    console.error("初始化失败：没有找到 vr-scene / level-root / main-camera");
+    return;
+  }
+
+  const gazeCursor = document.querySelector("#gaze-cursor");
+
+  if (gazeCursor) {
+    gazeCursor.object3D.renderOrder = 999;
+
+    gazeCursor.addEventListener("loaded", () => {
+      const mesh = gazeCursor.getObject3D("mesh");
+
+      if (mesh) {
+        mesh.renderOrder = 999;
+        mesh.material.depthTest = false;
+        mesh.material.depthWrite = false;
+        mesh.material.needsUpdate = true;
+      }
+    });
+  }
 
   preloadAssets();
 
   sceneEl.addEventListener("loaded", () => {
     cameraObject = cameraEl.object3D;
 
-    // 稳定普通渲染：我们不再调用 A-Frame 内置 enterVR，避免手机分屏白色叠层
     if (sceneEl.renderer) {
       sceneEl.renderer.autoClear = true;
       sceneEl.renderer.sortObjects = true;
@@ -297,6 +368,7 @@ window.addEventListener("DOMContentLoaded", () => {
     loadPanoramas();
   });
 
+  // 关键：这些不能再只等 DOMContentLoaded，否则动态加载 script.js 时会错过
   initLoadingFlow();
   setupGuideButtons();
   setupKeyboardInput();
@@ -304,7 +376,17 @@ window.addEventListener("DOMContentLoaded", () => {
   setupImageFallbacks();
 
   requestAnimationFrame(updateLoop);
-});
+
+  console.log("VR Project 初始化完成");
+}
+
+// 如果 DOM 还没加载完，就等 DOMContentLoaded
+if (document.readyState === "loading") {
+  window.addEventListener("DOMContentLoaded", bootProject);
+} else {
+  // 如果 DOMContentLoaded 已经过去了，就立刻初始化
+  bootProject();
+}
 
 // ===============================
 // 稳定版手机分屏 VR
@@ -668,95 +750,28 @@ function createFloatingObject(item, index) {
 // 手机教学页进入场景逻辑改进
 // ===============================
 function setupGuideButtonsAndFullScreen() {
+  // 现在教学页已经改为 3D 黑色 VR 教学空间。
+  // 旧 HTML 按钮不再作为主要入口，只保留兼容：如果按钮仍存在，点击也进入游戏。
   const controllerBtn = document.querySelector("#enter-controller-btn");
   const gazeBtn = document.querySelector("#enter-gaze-btn");
-  const currentSceneEl = document.querySelector("#vr-scene");
 
-  const enterHandler = () => {
-    if (hasEnteredScene) return;
-
-    hasEnteredScene = true;
-
-    const startScreen = document.querySelector("#start-screen");
-    const infoPanel = document.querySelector("#info");
-    const gazeCursor = document.querySelector("#gaze-cursor");
-
-    if (startScreen) {
-      startScreen.classList.add("hidden");
-    }
-
-    if (infoPanel) {
-      infoPanel.classList.remove("hidden");
-    }
-
-    if (currentSceneEl) {
-      currentSceneEl.classList.remove("hidden");
-    }
-
-    // 手机端全屏请求
-    const docEl = document.documentElement;
-
-    if (docEl.requestFullscreen) {
-      docEl.requestFullscreen().catch(() => {});
-    } else if (docEl.webkitRequestFullscreen) {
-      docEl.webkitRequestFullscreen();
-    } else if (docEl.msRequestFullscreen) {
-      docEl.msRequestFullscreen();
-    }
-
-    // 判断控制方式
-    if (gazeCursor) {
-      if (controlMode === "gaze") {
-        gazeCursor.classList.remove("hidden");
-        gazeCursor.setAttribute("visible", true);
-        updateInfo(`眼神控制：看向意象，凝视 ${GAZE_CONFIRM_SECONDS} 秒确认 / 取消`);
-      } else {
-        gazeCursor.classList.add("hidden");
-        gazeCursor.setAttribute("visible", false);
-        updateInfo("手柄模式：左摇杆切换 / 向下选择完成 / A确认");
-      }
-    }
-
-    // 初始化第一关
-    currentLevelIndex = 0;
-    currentLevelName = levelOrder[currentLevelIndex];
-
-    setPanorama(currentLevelName);
-    loadLevel(currentLevelName);
-  };
-
-  // 安全绑定：元素存在才绑定，不存在也不让页面卡死
   if (controllerBtn) {
     controllerBtn.addEventListener("click", () => {
-      controlMode = "gamepad";
-      enterHandler();
+      setControlMode("gamepad");
+      enterSceneFromGuide();
     });
-  } else {
-    console.warn("没有找到 #enter-controller-btn，请检查 index.html 里的按钮 id");
   }
 
   if (gazeBtn) {
     gazeBtn.addEventListener("click", () => {
-      controlMode = "gaze";
-      enterHandler();
+      setControlMode("gaze");
+      enterSceneFromGuide();
     });
-  } else {
-    console.warn("没有找到 #enter-gaze-btn，请检查 index.html 里的按钮 id");
-  }
-
-  if (currentSceneEl) {
-    currentSceneEl.addEventListener("touchstart", () => {
-      if (!hasEnteredScene) {
-        enterHandler();
-      }
-    });
-  } else {
-    console.warn("没有找到 #vr-scene，请检查 index.html 里的 a-scene id");
   }
 
   window.addEventListener("keydown", (e) => {
-    if (!hasEnteredScene && e.code === "Enter") {
-      enterHandler();
+    if (!hasEnteredScene && isGuideVisible && e.code === "Enter") {
+      enterSceneFromGuide();
     }
   });
 }
@@ -771,6 +786,13 @@ function preloadAssets() {
     console.warn("没有找到 a-assets，跳过图片预加载");
     return;
   }
+
+  Object.entries(GUIDE_IMAGES).forEach(([key, src]) => {
+    const img = document.createElement("img");
+    img.setAttribute("id", `${key}-guide-vr-img`);
+    img.setAttribute("src", src);
+    assetsEl.appendChild(img);
+  });
 
   Object.values(levelData).forEach((level) => {
     level.objects.forEach((item) => {
@@ -811,7 +833,6 @@ function initLoadingFlow() {
   const detectPanel = document.querySelector("#detect-panel");
   const loadingBar = document.querySelector("#loading-bar");
   const loadingText = document.querySelector("#loading-text");
-  const detectText = document.querySelector("#detect-text");
 
   let progress = 0;
 
@@ -834,30 +855,21 @@ function initLoadingFlow() {
       clearInterval(timer);
 
       setTimeout(() => {
-        if (loadingPanel) {
-          loadingPanel.classList.add("hidden");
+        // 不再显示“正在检测手柄”的中间页面，检测在后台完成
+        if (loadingPanel) loadingPanel.classList.add("hidden");
+        if (detectPanel) detectPanel.classList.add("hidden");
+
+        const gamepad = findConnectedGamepad();
+
+        if (gamepad) {
+          gamepadIndex = gamepad.index;
+          setControlMode("gamepad");
+        } else {
+          setControlMode("gaze");
         }
 
-        if (detectPanel) {
-          detectPanel.classList.remove("hidden");
-        }
-
-        if (detectText) {
-          detectText.textContent = "正在检测手柄连接，请稍候...";
-        }
-
-        setTimeout(() => {
-          const gamepad = findConnectedGamepad();
-
-          if (gamepad) {
-            gamepadIndex = gamepad.index;
-            controlMode = "gamepad";
-            showControllerGuide();
-          } else {
-            controlMode = "gaze";
-            showGazeGuide();
-          }
-        }, 900);
+        // 加载完成后直接进入“第0关”黑色 VR 教学空间
+        enterScene();
       }, 250);
     }
   }, 35);
@@ -868,37 +880,382 @@ function setupGuideButtons() {
 }
 
 function showControllerGuide() {
-  const detectPanel = document.querySelector("#detect-panel");
-  const controllerGuidePanel = document.querySelector("#controller-guide-panel");
-
-  if (detectPanel) {
-    detectPanel.classList.add("hidden");
-  }
-
-  if (controllerGuidePanel) {
-    controllerGuidePanel.classList.remove("hidden");
-  } else {
-    console.warn("没有找到 #controller-guide-panel，自动进入场景");
-    enterScene();
-  }
+  showVRGuideScene();
 }
 
 function showGazeGuide() {
+  showVRGuideScene();
+}
+
+// ===============================
+// VR 黑色教学空间：左右并列显示手柄 / 眼神教学图
+// ===============================
+
+function showVRGuideScene() {
+  if (!sceneEl || !cameraEl) return;
+
+  isGuideVisible = true;
+  isGuideEnteringGame = false;
+
+  const startScreen = document.querySelector("#start-screen");
+  const infoPanel = document.querySelector("#info");
   const detectPanel = document.querySelector("#detect-panel");
+  const controllerGuidePanel = document.querySelector("#controller-guide-panel");
   const gazeGuidePanel = document.querySelector("#gaze-guide-panel");
 
-  if (detectPanel) {
-    detectPanel.classList.add("hidden");
+  // 旧 HTML 页面全部隐藏，改为 3D 黑色教学空间
+  if (startScreen) startScreen.classList.add("hidden");
+  if (infoPanel) infoPanel.classList.add("hidden");
+  if (detectPanel) detectPanel.classList.add("hidden");
+  if (controllerGuidePanel) controllerGuidePanel.classList.add("hidden");
+  if (gazeGuidePanel) gazeGuidePanel.classList.add("hidden");
+
+  clearInteractiveObjects();
+  stopAllSoundsAndClearConfirmState();
+
+  // 教学空间保持纯黑
+  const oldSky = document.querySelector("#panorama-sky");
+  if (oldSky) oldSky.remove();
+  if (sceneEl.object3D) {
+    sceneEl.object3D.background = new THREE.Color(0x000000);
   }
 
-  if (gazeGuidePanel) {
-    gazeGuidePanel.classList.remove("hidden");
+  removeVRGuideScene();
+
+  // 注意：这里不再把教学图挂在 camera 上。
+  // 它们会固定在世界空间的左斜前 / 右斜前，所以电脑端鼠标拖拽视角可以正常看到移动。
+  guideRoot = document.createElement("a-entity");
+  guideRoot.setAttribute("id", "guide-scene-root");
+  guideRoot.setAttribute("position", "0 0 0");
+  levelRoot.appendChild(guideRoot);
+
+  // 左斜前：手柄教学图
+  guideControllerPlane = createGuideImagePlane({
+    id: "guide-controller-plane",
+    src: GUIDE_IMAGES.gamepad,
+    position: `-${GUIDE_PANEL_X} ${GUIDE_PANEL_Y} ${GUIDE_PANEL_Z}`,
+    rotation: `0 ${GUIDE_PANEL_YAW} 0`
+  });
+
+  // 右斜前：眼神教学图
+  guideGazePlane = createGuideImagePlane({
+    id: "guide-gaze-plane",
+    src: GUIDE_IMAGES.gaze,
+    position: `${GUIDE_PANEL_X} ${GUIDE_PANEL_Y} ${GUIDE_PANEL_Z}`,
+    rotation: `0 -${GUIDE_PANEL_YAW} 0`
+  });
+
+  guideRoot.appendChild(guideControllerPlane);
+  guideRoot.appendChild(guideGazePlane);
+
+// 左侧手柄教学图里的 OK 区域：点击可进入，手柄 A 也可进入
+createGuideOkButton({
+  parentPanel: guideControllerPlane,
+  mode: "gamepad",
+  position: `${GUIDE_OK_X} ${GUIDE_OK_Y} ${GUIDE_OK_Z}`
+});
+
+// 右侧眼神教学图里的 OK 区域：凝视 3 秒进入
+guideEnterButton = createGuideOkButton({
+  parentPanel: guideGazePlane,
+  mode: "gaze",
+  position: `${GUIDE_OK_X} ${GUIDE_OK_Y} ${GUIDE_OK_Z}`
+});
+
+  // 保证进入教学空间时 look-controls 仍然可用，电脑端鼠标拖拽视角能移动
+  cameraEl.setAttribute("look-controls", "enabled: true");
+  const canvas = sceneEl.canvas || document.querySelector("canvas");
+  if (canvas) {
+    canvas.style.pointerEvents = "auto";
+    canvas.style.touchAction = "none";
+  }
+
+  // 有手柄就默认手柄模式，否则默认眼神模式。两张图始终同时显示。
+  const gamepad = findConnectedGamepad();
+  if (gamepad) {
+    gamepadIndex = gamepad.index;
+    setControlMode("gamepad");
   } else {
-    console.warn("没有找到 #gaze-guide-panel，自动进入场景");
-    enterScene();
+    setControlMode("gaze");
   }
 }
 
+function createGuideImagePlane({ id, src, position, rotation }) {
+  const plane = document.createElement("a-plane");
+  plane.setAttribute("id", id);
+  plane.setAttribute("width", GUIDE_PANEL_WIDTH);
+  plane.setAttribute("height", GUIDE_PANEL_HEIGHT);
+  plane.setAttribute("position", position);
+  plane.setAttribute("rotation", rotation);
+  plane.setAttribute(
+    "material",
+    `shader: flat; src: url(${src}); transparent: true; opacity: 1; depthWrite: false; depthTest: false; side: double`
+  );
+  plane.object3D.renderOrder = 10;
+  return plane;
+}
+
+
+function createGuideOkButton({ parentPanel, mode, position }) {
+  const okGroup = document.createElement("a-entity");
+  okGroup.classList.add("interactive-hitbox");
+  okGroup.setAttribute("position", position);
+  okGroup.objectData = {
+    type: "guide-ok-button",
+    mode,
+    feedbackPlane: null,
+    progressCircle: null
+  };
+
+  const hitbox = document.createElement("a-plane");
+  hitbox.classList.add("interactive-hitbox");
+  hitbox.setAttribute("width", GUIDE_OK_WIDTH);
+  hitbox.setAttribute("height", GUIDE_OK_HEIGHT);
+  hitbox.setAttribute("position", "0 0 0");
+  hitbox.setAttribute(
+    "material",
+    "shader: flat; color: #ffffff; transparent: true; opacity: 0.001; depthWrite: false; depthTest: false; side: double"
+  );
+  hitbox.object3D.renderOrder = 200;
+
+  // 注册给自定义视线检测使用：
+  // 这样即使 A-Frame 的 mouseenter 在某些浏览器里不稳定，
+  // updateGuideGazeRaycast() 也能稳定检测到右侧 OK 按钮。
+  hitbox.object3D.userData.guideOkButton = okGroup;
+  guideOkRaycastObjects.push(hitbox.object3D);
+
+  hitbox.addEventListener("loaded", () => {
+    const mesh = hitbox.getObject3D("mesh");
+    if (mesh) {
+      mesh.userData.guideOkButton = okGroup;
+      if (!guideOkRaycastObjects.includes(mesh)) {
+        guideOkRaycastObjects.push(mesh);
+      }
+    }
+  });
+
+  okGroup.appendChild(hitbox);
+
+  const feedback = document.createElement("a-plane");
+  feedback.setAttribute("width", GUIDE_OK_WIDTH);
+  feedback.setAttribute("height", GUIDE_OK_HEIGHT);
+  feedback.setAttribute("position", "0 0 0.02");
+  feedback.setAttribute(
+    "material",
+    "shader: flat; color: #ffffff; transparent: true; opacity: 0; depthWrite: false; depthTest: false; side: double"
+  );
+  feedback.object3D.renderOrder = 201;
+  okGroup.appendChild(feedback);
+
+  const progressCircle = document.createElement("a-circle");
+  progressCircle.setAttribute("radius", "0.18");
+  progressCircle.setAttribute("segments", "64");
+  progressCircle.setAttribute("position", "0 0 0.04");
+  progressCircle.setAttribute("scale", "0.1 0.1 0.1");
+  progressCircle.setAttribute(
+    "material",
+    "shader: flat; color: #ffffff; transparent: true; opacity: 0; depthWrite: false; depthTest: false; side: double"
+  );
+  progressCircle.object3D.renderOrder = 202;
+  okGroup.appendChild(progressCircle);
+
+  okGroup.objectData.feedbackPlane = feedback;
+  okGroup.objectData.progressCircle = progressCircle;
+
+  const onEnter = () => {
+    if (!isGuideVisible || isGuideEnteringGame) return;
+
+    updateGuideOkVisual(okGroup, 0.12);
+
+    if (mode === "gaze") {
+      setControlMode("gaze");
+      startGuideGazeEnter(okGroup);
+    }
+  };
+
+  const onLeave = () => {
+    if (mode === "gaze") {
+      cancelGuideGazeEnter(okGroup);
+    }
+    updateGuideOkVisual(okGroup, 0);
+  };
+
+  const onClick = () => {
+    if (!isGuideVisible || isGuideEnteringGame) return;
+
+    if (mode === "gamepad") {
+      setControlMode("gamepad");
+      enterSceneFromGuide();
+    } else {
+      setControlMode("gaze");
+      enterSceneFromGuide();
+    }
+  };
+
+  [okGroup, hitbox].forEach((target) => {
+    target.addEventListener("mouseenter", onEnter);
+    target.addEventListener("mouseleave", onLeave);
+    target.addEventListener("click", onClick);
+    target.addEventListener("touchstart", onClick);
+  });
+
+  parentPanel.appendChild(okGroup);
+  return okGroup;
+}
+
+function removeVRGuideScene() {
+  cancelGuideGazeEnter();
+
+  if (guideRoot) {
+    guideRoot.remove();
+    guideRoot = null;
+  }
+
+  guideControllerPlane = null;
+  guideGazePlane = null;
+  guideEnterButton = null;
+  guideOkRaycastObjects.length = 0;
+guideGazeTarget = null;
+  guideProgressCircle = null;
+  isGuideVisible = false;
+}
+
+function startGuideGazeEnter(target) {
+  if (!isGuideVisible || controlMode !== "gaze" || isGuideEnteringGame) return;
+  if (!target) return;
+
+  cancelGuideGazeEnter();
+
+  guideGazeTarget = target;
+  guideGazeStartTime = performance.now();
+
+  const durationMs = GUIDE_GAZE_SECONDS * 1000;
+
+  guideGazeProgressTimer = setInterval(() => {
+    if (!guideGazeTarget) return;
+
+    const elapsed = performance.now() - guideGazeStartTime;
+    const progress = Math.min(elapsed / durationMs, 1);
+
+    updateGuideOkVisual(guideGazeTarget, progress);
+  }, 70);
+
+  guideGazeTimer = setTimeout(() => {
+    cancelGuideGazeEnter();
+    enterSceneFromGuide();
+  }, durationMs);
+}
+
+function cancelGuideGazeEnter(target = null) {
+  if (target && guideGazeTarget && target !== guideGazeTarget) return;
+
+  if (guideGazeTimer) {
+    clearTimeout(guideGazeTimer);
+    guideGazeTimer = null;
+  }
+
+  if (guideGazeProgressTimer) {
+    clearInterval(guideGazeProgressTimer);
+    guideGazeProgressTimer = null;
+  }
+
+  if (guideGazeTarget) {
+    updateGuideOkVisual(guideGazeTarget, 0);
+  }
+
+  guideGazeTarget = null;
+  guideGazeStartTime = 0;
+}
+
+function updateGuideOkVisual(target, progress) {
+  if (!target || !target.objectData) return;
+
+  const feedback = target.objectData.feedbackPlane;
+  const circle = target.objectData.progressCircle;
+
+  const scale = 1 + progress * 0.12;
+  target.object3D.scale.set(scale, scale, scale);
+
+  if (feedback) {
+    feedback.setAttribute("material", "opacity", progress > 0 ? 0.035 + progress * 0.12 : 0);
+  }
+
+  if (circle) {
+    const circleScale = 0.15 + progress * 1.65;
+    circle.setAttribute("scale", `${circleScale} ${circleScale} ${circleScale}`);
+    circle.setAttribute("material", "opacity", progress > 0 ? 0.18 + progress * 0.5 : 0);
+  }
+}
+
+function updateGuideGazeRaycast() {
+  if (!isGuideVisible || hasEnteredScene || isGuideEnteringGame) return;
+  if (controlMode !== "gaze") return;
+  if (!cameraObject || guideOkRaycastObjects.length === 0) return;
+
+  cameraObject.getWorldPosition(guideRayOrigin);
+  cameraObject.getWorldDirection(guideRayDirection);
+
+  guideRaycaster.set(guideRayOrigin, guideRayDirection);
+
+  const intersections = guideRaycaster.intersectObjects(guideOkRaycastObjects, true);
+
+  if (intersections.length > 0) {
+    const hit = intersections[0].object;
+    const target = hit.userData.guideOkButton;
+
+    if (target && target.objectData && target.objectData.mode === "gaze") {
+      startGuideGazeEnter(target);
+      return;
+    }
+  }
+
+  cancelGuideGazeEnter();
+}
+
+function updateGuideInfo(text) {
+  // 教学空间的说明已经写在图片里，不再显示左上角信息，避免干扰画面。
+  // 进入正式关卡后，updateInfo() 会继续正常显示关卡提示。
+  if (isGuideVisible) return;
+
+  const infoPanel = document.querySelector("#info");
+  const infoText = document.querySelector("#info p");
+
+  if (infoPanel) infoPanel.classList.remove("hidden");
+  if (infoText) infoText.textContent = text;
+}
+
+function enterSceneFromGuide() {
+  if (hasEnteredScene || isGuideEnteringGame) return;
+
+  isGuideEnteringGame = true;
+
+  const fogOverlay = document.querySelector("#fog-overlay");
+
+  if (!fogOverlay) {
+    removeVRGuideScene();
+    enterScene();
+    return;
+  }
+
+  // 进入第一关也使用白色渐显/渐隐，让教学空间自然过渡到真实关卡
+  fogOverlay.style.display = "block";
+  fogOverlay.style.transition = "opacity 1.2s ease-in-out";
+  fogOverlay.style.opacity = "1";
+
+  setTimeout(() => {
+    removeVRGuideScene();
+    enterScene();
+
+    fogOverlay.style.transition = "opacity 1.4s ease-in-out";
+    fogOverlay.style.opacity = "0";
+
+    setTimeout(() => {
+      fogOverlay.style.transition = "";
+      fogOverlay.style.display = "";
+      isGuideEnteringGame = false;
+    }, 1400);
+  }, 1400);
+}
 
 function setupImageFallbacks() {
   const guideImages = document.querySelectorAll(".guide-image");
@@ -913,29 +1270,38 @@ function setupImageFallbacks() {
 function enterScene() {
   if (hasEnteredScene) return;
 
+  // A-Frame 场景和摄像机有时比 loading 稍慢，没准备好就等一下再进入。
+  if (!sceneEl || !cameraEl || !cameraObject || !levelRoot) {
+    setTimeout(enterScene, 120);
+    return;
+  }
+
+  removeVRGuideScene();
+
   hasEnteredScene = true;
 
-  document.querySelector("#start-screen").classList.add("hidden");
-  document.querySelector("#info").classList.remove("hidden");
-  sceneEl.classList.remove("hidden");
+  const startScreen = document.querySelector("#start-screen");
+  const infoPanel = document.querySelector("#info");
+
+  if (startScreen) startScreen.classList.add("hidden");
+  if (infoPanel) infoPanel.classList.remove("hidden");
+  if (sceneEl) sceneEl.classList.remove("hidden");
 
   const gazeCursor = document.querySelector("#gaze-cursor");
 
-  if (controlMode === "gaze") {
-    gazeCursor.classList.remove("hidden");
-    gazeCursor.setAttribute("visible", true);
-    updateInfo("眼神控制：看向意象预选，点击屏幕确认 / 取消");
-  } else {
-    gazeCursor.classList.add("hidden");
-    gazeCursor.setAttribute("visible", false);
-    updateInfo("手柄模式：左摇杆切换 / 向下选择完成 / A确认");
+  if (gazeCursor) {
+    if (controlMode === "gaze") {
+      gazeCursor.classList.remove("hidden");
+      gazeCursor.setAttribute("visible", true);
+    } else {
+      gazeCursor.classList.add("hidden");
+      gazeCursor.setAttribute("visible", false);
+    }
   }
 
+  // 先进入第0关教学空间，而不是直接进入 floor1。
   currentLevelIndex = 0;
-  currentLevelName = levelOrder[currentLevelIndex];
-
-  setPanorama(currentLevelName);
-  loadLevel(currentLevelName);
+  loadGuideLevel();
 }
 
 // ===============================
@@ -1077,6 +1443,127 @@ function setVisualScale(target, x, y, z) {
   if (target.object3D) {
     target.object3D.scale.set(x, y, z);
   }
+}
+
+
+// ===============================
+// 第0关：黑色 VR 教学空间
+// ===============================
+
+function loadGuideLevel() {
+  clearInteractiveObjects();
+  cancelGazeConfirm();
+  stopAllSoundsAndClearConfirmState();
+
+  currentLevelName = "guide";
+
+  // 第0关使用纯黑空间。这里不用额外黑色全景图，直接让场景背景为黑色。
+  const oldSky = document.querySelector("#panorama-sky");
+  if (oldSky) oldSky.remove();
+
+  if (sceneEl && sceneEl.object3D) {
+    sceneEl.object3D.background = new THREE.Color(0x000000);
+  }
+
+  // 左侧：手柄教学图
+  const controllerGuide = createGuideImagePlane({
+    id: "guide-controller-panel",
+    src: GUIDE_IMAGES.gamepad,
+    position: `-${GUIDE_PANEL_X} ${GUIDE_PANEL_Y} ${GUIDE_PANEL_Z}`,
+    rotation: `0 ${GUIDE_PANEL_YAW} 0`
+  });
+
+  // 右侧：眼神教学图
+  const gazeGuide = createGuideImagePlane({
+    id: "guide-gaze-panel",
+    src: GUIDE_IMAGES.gaze,
+    position: `${GUIDE_PANEL_X} ${GUIDE_PANEL_Y} ${GUIDE_PANEL_Z}`,
+    rotation: `0 -${GUIDE_PANEL_YAW} 0`
+  });
+
+  levelRoot.appendChild(controllerGuide);
+  levelRoot.appendChild(gazeGuide);
+
+  interactiveObjects.push({ el: controllerGuide, type: "guide-panel", id: "guide-controller-panel" });
+  interactiveObjects.push({ el: gazeGuide, type: "guide-panel", id: "guide-gaze-panel" });
+
+  // 中间白色圆球：沿用正式关卡的凝视/确认模式
+  const enterButton = createGuideEnterButton();
+  levelRoot.appendChild(enterButton);
+
+  if (controlMode === "gamepad") {
+    selectedIndex = 0;
+    updateInfo("教学页 | 手柄模式：按 A 进入第一关");
+  } else {
+    selectedIndex = -1;
+    updateInfo(`教学页 | 凝视中间白色圆球 ${GAZE_CONFIRM_SECONDS} 秒进入第一关`);
+  }
+
+  updateObjectVisualStates();
+}
+
+function createGuideEnterButton() {
+  const group = document.createElement("a-entity");
+  group.classList.add("interactive");
+
+  // 白色圆球放在两张教学图中间偏下的位置。
+  // 你想上下左右微调，就改这里的 x / y / z。
+  const enterPosition = new THREE.Vector3(0, -1.45, -3.95);
+  group.setAttribute("position", vectorToPositionString(enterPosition));
+
+  group.objectData = {
+    type: "guide-enter-button",
+    label: "进入",
+    followCamera: false,
+    basePosition: enterPosition.clone(),
+    baseScale: 1,
+    floatOffset: 5,
+    mainImage: null,
+    labelEntity: null
+  };
+
+  const sphere = document.createElement("a-circle");
+  sphere.classList.add("interactive-hitbox");
+  sphere.setAttribute("radius", "0.38");
+  sphere.setAttribute("segments", "64");
+  sphere.setAttribute(
+    "material",
+    "shader: flat; color: #ffffff; transparent: true; opacity: 0.9; depthWrite: false; depthTest: false; side: double"
+  );
+  sphere.setAttribute("position", "0 0 0");
+  sphere.object3D.renderOrder = 25;
+  group.appendChild(sphere);
+
+  const label = createTextLabel("进入");
+  label.setAttribute("position", "0 -0.62 0.04");
+  label.object3D.renderOrder = 4;
+  group.appendChild(label);
+
+  group.objectData.mainImage = sphere;
+  group.objectData.labelEntity = label;
+
+  setupInteractiveEvents(group);
+
+  const objectRecord = {
+    el: group,
+    type: "guide-enter-button",
+    id: "guide-enter-button"
+  };
+
+  interactiveObjects.push(objectRecord);
+  selectableObjects.push(objectRecord);
+
+  return group;
+}
+
+function enterFirstLevelFromGuide() {
+  if (isLevelTransitioning) return;
+
+  stopAllSoundsAndClearConfirmState();
+  cancelGazeConfirm();
+
+  currentLevelIndex = 0;
+  transitionToLevel(levelOrder[currentLevelIndex]);
 }
 
 // ===============================
@@ -1309,7 +1796,11 @@ function setupInteractiveEvents(group) {
       if (selectedIndex === currentIndex) {
         selectedIndex = -1;
         updateObjectVisualStates();
-        updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象进行预选`);
+        if (currentLevelName === "guide") {
+          updateInfo(`教学页 | 凝视中间白色圆球 ${GAZE_CONFIRM_SECONDS} 秒进入第一关`);
+        } else {
+          updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象进行预选`);
+        }
       }
 
       cancelGazeConfirm(group);
@@ -1413,6 +1904,11 @@ function updateGazeProgressInfo(entity, progress) {
   const data = entity.objectData;
   const percent = Math.round(progress * 100);
 
+  if (data.type === "guide-enter-button") {
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 凝视进入 ${percent}% | 满 ${GAZE_CONFIRM_SECONDS} 秒进入第一关`);
+    return;
+  }
+
   if (data.type === "finish-button") {
     updateInfo(`${levelDisplayNames[currentLevelName]} | 凝视完成 ${percent}% | 满 ${GAZE_CONFIRM_SECONDS} 秒进入下一关`);
     return;
@@ -1442,7 +1938,7 @@ function moveSelection(direction) {
 
   const currentObject = getSelectedObject();
 
-  if (currentObject?.type === "finish-button") {
+  if (currentObject?.type === "finish-button" || currentObject?.type === "guide-enter-button") {
     selectedIndex = direction > 0 ? 0 : soundObjectCount - 1;
     updateSelectionInfo();
     return;
@@ -1482,6 +1978,11 @@ function updateSelectionInfo() {
   const soundId = data.id;
   const isConfirmed = soundId && confirmedSoundIds.has(soundId);
 
+  if (type === "guide-enter-button") {
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前预选：进入 | 确认后进入第一关`);
+    return;
+  }
+
   if (type === "finish-button") {
     updateInfo(`${levelDisplayNames[currentLevelName]} | 当前预选：完成 | 确认后进入下一关`);
     return;
@@ -1515,6 +2016,11 @@ function handleAButtonClick() {
   }
 
   const data = selectedObject.el.objectData;
+
+  if (data.type === "guide-enter-button") {
+    enterFirstLevelFromGuide();
+    return;
+  }
 
   if (data.type === "sound-object") {
     toggleSoundObjectConfirm(selectedObject.el);
@@ -1705,11 +2211,19 @@ function setControlMode(mode) {
         selectedIndex = 0;
       }
       updateObjectVisualStates();
-      updateInfo("手柄模式：左摇杆切换 / 向下选择完成 / A确认");
+      if (currentLevelName === "guide") {
+        updateInfo("教学页 | 手柄模式：按 A 进入第一关");
+      } else {
+        updateInfo("手柄模式：左摇杆切换 / 向下选择完成 / A确认");
+      }
     } else {
       selectedIndex = -1;
       updateObjectVisualStates();
-      updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象，凝视 ${GAZE_CONFIRM_SECONDS} 秒确认`);
+      if (currentLevelName === "guide") {
+        updateInfo(`教学页 | 凝视中间白色圆球 ${GAZE_CONFIRM_SECONDS} 秒进入第一关`);
+      } else {
+        updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象，凝视 ${GAZE_CONFIRM_SECONDS} 秒确认`);
+      }
     }
   }
 }
@@ -1778,11 +2292,17 @@ function checkGamepadInput() {
     gamepadIndex = gamepad.index;
   }
 
-  // 教学页 / 未进入场景时：按 A 直接进入手柄模式
+  // 黑色教学空间 / 未进入关卡时：两张教学图同时显示。
+  // 如果检测到手柄输入，就暗中切到手柄模式；按 A 进入游戏。
   if (!hasEnteredScene) {
+    if (isMeaningfulGamepadInput(gamepad)) {
+      gamepadIndex = gamepad.index;
+      setControlMode("gamepad");
+    }
+
     if (aButtonPressed && !previousAButtonPressed) {
       setControlMode("gamepad");
-      enterScene();
+      enterSceneFromGuide();
     }
 
     previousAButtonPressed = aButtonPressed;
@@ -1859,7 +2379,7 @@ function setupKeyboardInput() {
   window.addEventListener("keydown", (event) => {
     // 教学页：按 Enter 进入场景
     if (event.code === "Enter" && !hasEnteredScene) {
-      enterScene();
+      enterSceneFromGuide();
       return;
     }
 
@@ -1886,6 +2406,11 @@ function setupKeyboardInput() {
     }
 
     if (event.code === "Space" || event.code === "Enter") {
+      if (currentLevelName === "guide") {
+        enterFirstLevelFromGuide();
+        return;
+      }
+
       handleAButtonClick();
       updateObjectVisualStates();
       return;
@@ -1899,6 +2424,8 @@ function setupKeyboardInput() {
 
 function updateLoop() {
   checkGamepadInput();
+
+  // 第0关教学页已经并入正式关卡系统，不再使用旧教学页 raycaster。
 
   if (hasEnteredScene) {
     updateObjectVisualStates();
@@ -1923,7 +2450,7 @@ function updateObjectVisualStates() {
 
     const isSelected = index === selectedIndex;
     const isConfirmed = data.id && confirmedSoundIds.has(data.id);
-    const isFinishButton = data.type === "finish-button";
+    const isFinishButton = data.type === "finish-button" || data.type === "guide-enter-button";
 
     // ===============================
     // 位置与朝向

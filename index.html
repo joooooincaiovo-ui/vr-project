@@ -6,8 +6,13 @@
 
   <title>VR Project</title>
 
-  <!-- A-Frame：使用你测试过可运行的版本 -->
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- A-Frame：优先读取本地 libs/aframe.min.js，避免 CDN 连接失败导致 AFRAME is not defined -->
+  <script src="./libs/aframe.min.js"></script>
+  <script>
+    if (!window.AFRAME) {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-master.min.js"><\/script>');
+    }
+  </script>
 
   <link rel="stylesheet" href="./style.css" />
 </head>
@@ -45,7 +50,7 @@
       <img
         id="controller-guide-image"
         class="guide-image"
-        src="./assets/ui/controller-guide.png"
+        src="./assets/ui/controller-guide-vr.png"
         alt="手柄操作教学图"
       />
 
@@ -66,7 +71,7 @@
       <img
         id="gaze-guide-image"
         class="guide-image"
-        src="./assets/ui/gaze-guide.png"
+        src="./assets/ui/gaze-guide-vr.png"
         alt="眼神控制教学图"
       />
 
@@ -114,9 +119,10 @@
   class="hidden"
   fuse="false"
   raycaster="objects: .interactive-hitbox"
-  material="color: white; opacity: 0.85; transparent: true"
+  material="color: white; opacity: 0.95; transparent: true; depthTest: false; depthWrite: false"
   geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.014"
-  position="0 0 -1"
+  position="0 0 -0.8"
+  render-order="999"
 ></a-cursor>
       </a-camera>
     </a-entity>
@@ -125,6 +131,14 @@
     <a-entity id="level-root"></a-entity>
   </a-scene>
 
-  <script src="./script.js"></script>
+  <script>
+    if (!window.AFRAME) {
+      alert("A-Frame 没有加载成功，VR 场景无法启动。请把 aframe.min.js 放进 libs 文件夹，路径为 ./libs/aframe.min.js。");
+    } else {
+      const projectScript = document.createElement("script");
+      projectScript.src = "./script.js";
+      document.body.appendChild(projectScript);
+    }
+  </script>
 </body>
 </html>
