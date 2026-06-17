@@ -3315,11 +3315,9 @@ function createEndingReplayButton({ levelName, title, subtitle, x }) {
     gazeProgressRing: null
   };
 
-  // 发光外圈：预选 / 播放时显示
-  const glowPlane = createEndingButtonGlowPlane();
-  glowPlane.setAttribute("position", "0 0 -0.03");
-  group.appendChild(glowPlane);
-  group.objectData.glowPlane = glowPlane;
+  // 不再使用单独的 glowPlane。
+// 手机端会把透明 canvas 的背景渲染成黑方块，所以选中反馈改由按钮本体缩放 + 凝视圆环完成。
+group.objectData.glowPlane = null;
 
   // 可见按钮：同时也是凝视命中区
   // 不再额外创建白色/透明 hitbox，避免出现难看的矩形块
@@ -3407,43 +3405,7 @@ function createEndingButtonPlane({ title, subtitle, isActive }) {
 }
 
 
-function createEndingButtonGlowPlane() {
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
 
-  canvas.width = 760;
-  canvas.height = 420;
-
-  context.clearRect(0, 0, canvas.width, canvas.height);
-
-  // 更柔和的白色光晕，不要硬边框
-  context.shadowColor = "rgba(255, 255, 255, 0.62)";
-  context.shadowBlur = 46;
-  context.shadowOffsetX = 0;
-  context.shadowOffsetY = 0;
-
-  context.strokeStyle = "rgba(255, 255, 255, 0.58)";
-  context.lineWidth = 3;
-
-  roundRect(context, 86, 96, 588, 228, 46);
-  context.stroke();
-
-  const glow = createCanvasPlaneEntity(canvas, 1.50, 0.82, 118, 0);
-  glow.setAttribute("visible", false);
-
-  // 关键：使用加法混合，避免透明区域在手机端显示成黑方块
-  const mesh = glow.getObject3D("mesh");
-  if (mesh && mesh.material) {
-    mesh.material.blending = THREE.AdditiveBlending;
-    mesh.material.transparent = true;
-    mesh.material.depthWrite = false;
-    mesh.material.depthTest = false;
-    mesh.material.toneMapped = false;
-    mesh.material.needsUpdate = true;
-  }
-
-  return glow;
-}
 
 
 function getSoundItemById(soundId) {
