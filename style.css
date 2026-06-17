@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "AkzidenzCondensed";
+  src: url("./assets/fonts/AkzidenzGroteskBQCondensed.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -10,7 +18,12 @@ body {
   height: 100%;
   overflow: hidden;
   background: #000;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "AkzidenzCondensed", Arial, Helvetica, sans-serif;
+  button,
+input,
+textarea {
+  font-family: "AkzidenzCondensed", Arial, Helvetica, sans-serif;
+}
 }
 
 .hidden {
@@ -338,7 +351,7 @@ body.a-fullscreen #fog-overlay {
   opacity: 0.7;
 }
 
-/* 进入分屏后隐藏普通 VR 按钮 */
+/* Enter分屏后隐藏普通 VR 按钮 */
 #vr-toggle-btn.hidden-in-split {
   display: none !important;
 }

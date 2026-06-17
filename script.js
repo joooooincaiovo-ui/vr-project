@@ -102,11 +102,24 @@ const playedSoundRecords = {
   floor3: []
 };
 
+// 每一关点击“完成”时，真正保存下来的最终声音组合
+const finalSoundRecords = {
+  floor1: [],
+  floor2: [],
+  floor3: []
+};
+
+// 结尾页回放用
+let endingRoot = null;
+let endingReplayAudios = [];
+let endingActiveReplayLevel = null;
+
 const levelDisplayNames = {
-  guide: "教学页",
-  floor1: "F1 一楼走廊",
-  floor2: "F2 室外空地",
-  floor3: "F3 二楼中庭"
+  guide: "Guide",
+  floor1: "F1 Hallway",
+  floor2: "F2 Outdoor Space",
+  floor3: "F3 Atrium",
+  ending: "Finale"
 };
 
 // ===============================
@@ -128,15 +141,15 @@ const OUTLINE_SCALE = 1.0;
 // 眼神凝视确认参数
 // ===============================
 
-// 凝视多少秒后确认 / 取消 / 完成
+// 凝视多少秒后确认 / 取消 / Done
 // 想改成 2 秒就写 2，想改成 4 秒就写 4
 const GAZE_CONFIRM_SECONDS = 2;
 
-// 完成按钮相对于“前两个意象中点”的下移距离
+// Done按钮相对于“前两个意象中点”的下移距离
 // 数值越小越靠下，例如 -1.2 会更低，-0.5 会更高
 const FINISH_BUTTON_Y_OFFSET = -1.5;
 
-// 完成按钮稍微向镜头方向靠近一点，避免和意象重叠
+// Done按钮稍微向镜头方向靠近一点，避免和意象重叠
 // 数值越大越靠近玩家
 const FINISH_BUTTON_FORWARD_OFFSET = 0.35;
 
@@ -200,7 +213,7 @@ const levelData = {
     objects: [
       {
         id: "f1-fish",
-        label: "金鱼",
+        label: "Goldfish",
         soundName: "门口鱼缸水流声",
         audioSrc: "./assets/sounds/f1-01.mp3",
         volume: 0.75,
@@ -210,7 +223,7 @@ const levelData = {
       },
       {
         id: "f1-cricket",
-        label: "蛐蛐",
+        label: "Cricket",
         soundName: "蝉鸣声",
         audioSrc: "./assets/sounds/f1-02.mp3",
         volume: 0.75,
@@ -220,7 +233,7 @@ const levelData = {
       },
       {
         id: "f1-lilac",
-        label: "紫丁香",
+        label: "Lilac",
         soundName: "寂静中的风声",
         audioSrc: "./assets/sounds/f1-03.mp3",
         volume: 0.75,
@@ -230,7 +243,7 @@ const levelData = {
       },
       {
         id: "f1-red-door",
-        label: "红门",
+        label: "Red Door",
         soundName: "雨声",
         audioSrc: "./assets/sounds/f1-04.mp3",
         volume: 0.25,
@@ -240,7 +253,7 @@ const levelData = {
       },
       {
         id: "f1-tile",
-        label: "花砖",
+        label: "Floral Tile",
         soundName: "风吹树叶的声音",
         audioSrc: "./assets/sounds/f1-05.mp3",
         volume: 0.75,
@@ -256,8 +269,8 @@ const levelData = {
   objects: [
     {
       id: "f2-guitar",
-      label: "吉他",
-      soundName: "吉他",
+      label: "Guitar",
+      soundName: "Guitar",
       audioSrc: "./assets/sounds/f2-01.mp3",
       volume: 0.45,
       imageSrc: "./assets/f2-images/f2-guitar.png",
@@ -266,8 +279,8 @@ const levelData = {
     },
     {
       id: "f2-piano",
-      label: "钢琴键",
-      soundName: "钢琴",
+      label: "Piano Key",
+      soundName: "Piano",
       audioSrc: "./assets/sounds/f2-02.mp3",
       volume: 0.45,
       imageSrc: "./assets/f2-images/f2-piano.png",
@@ -276,7 +289,7 @@ const levelData = {
     },
     {
       id: "f2-glass",
-      label: "玻璃碎片",
+      label: "Glass Shard",
       soundName: "舞蹈律动声音",
       audioSrc: "./assets/sounds/f2-03.mp3",
       volume: 0.75,
@@ -286,7 +299,7 @@ const levelData = {
     },
     {
       id: "f2-leaf",
-      label: "树叶",
+      label: "Leaf",
       soundName: "阳光的声音",
       audioSrc: "./assets/sounds/f2-04.mp3",
       volume: 0.75,
@@ -296,7 +309,7 @@ const levelData = {
     },
     {
       id: "f2-stone",
-      label: "小石头",
+      label: "Small Stone",
       soundName: "石质乐器的声音",
       audioSrc: "./assets/sounds/f2-05.mp3",
       volume: 0.75,
@@ -312,8 +325,8 @@ const levelData = {
   objects: [
     {
       id: "f3-book",
-      label: "绘本",
-      soundName: "木地板脚步声",
+      label: "Picture Book",
+      soundName: "Wooden Floor Footsteps",
       audioSrc: "./assets/sounds/f3-01.mp3",
       volume: 0.75,
       imageSrc: "./assets/f3-images/f3-book.png",
@@ -322,7 +335,7 @@ const levelData = {
     },
     {
       id: "f3-camera",
-      label: "相机",
+      label: "Camera",
       soundName: "清晨阳光洒落的声音",
       audioSrc: "./assets/sounds/f3-02.mp3",
       volume: 0.75,
@@ -332,7 +345,7 @@ const levelData = {
     },
     {
       id: "f3-doll",
-      label: "玩偶",
+      label: "Plaything",
       soundName: "灰尘漂浮的声音",
       audioSrc: "./assets/sounds/f3-03.mp3",
       volume: 0.55,
@@ -342,7 +355,7 @@ const levelData = {
     },
     {
       id: "f3-hand",
-      label: "木制的手",
+      label: "Wooden Hand",
       soundName: "轻微触碰木头的声音",
       audioSrc: "./assets/sounds/f3-04.mp3",
       volume: 0.75,
@@ -352,7 +365,7 @@ const levelData = {
     },
     {
       id: "f3-pupa",
-      label: "黄门",
+      label: "Yellow Door",
       soundName: "细小的生命声",
       audioSrc: "./assets/sounds/f3-05.mp3",
       volume: 0.75,
@@ -364,11 +377,23 @@ const levelData = {
 }
 };
 
+async function loadProjectFont() {
+  if (!document.fonts) return;
+
+  try {
+    await document.fonts.load('44px "AkzidenzCondensed"');
+    await document.fonts.ready;
+    console.log("Project font loaded.");
+  } catch (error) {
+    console.warn("Project font failed to load. Fallback font will be used.", error);
+  }
+}
+
 // ===============================
 // 初始化
 // ===============================
 
-function bootProject() {
+async function bootProject() {
   // 防止重复初始化
   if (window.__vrProjectBooted) return;
   window.__vrProjectBooted = true;
@@ -401,6 +426,8 @@ function bootProject() {
 
   preloadAssets();
 
+  await loadProjectFont();
+
   sceneEl.addEventListener("loaded", () => {
     cameraObject = cameraEl.object3D;
 
@@ -423,7 +450,7 @@ function bootProject() {
 
   requestAnimationFrame(updateLoop);
 
-  console.log("VR Project 初始化完成");
+  console.log("VR Project 初始化Done");
 }
 
 // 如果 DOM 还没加载完，就等 DOMContentLoaded
@@ -485,7 +512,7 @@ function enterCustomSplitVR() {
 
   customSplitMode = true;
 
-  // 进入分屏后，如果有手柄，就自动切回手柄模式。
+  // Enter分屏后，如果有手柄，就自动切回手柄模式。
   // 这样即使加载页最初没有检测到手柄，后面连接手柄也能继续用。
   const gamepad = findConnectedGamepad();
   if (gamepad) {
@@ -647,7 +674,7 @@ function injectCustomSplitVRStyles() {
 
 
 // ===============================
-// 教学页点击进入场景
+// 教学页点击Enter场景
 // ===============================
 
 // ===============================
@@ -793,11 +820,11 @@ function createFloatingObject(item, index) {
 // ===============================
 
 // ===============================
-// 手机教学页进入场景逻辑改进
+// 手机教学页Enter场景逻辑改进
 // ===============================
 function setupGuideButtonsAndFullScreen() {
   // 现在教学页已经改为 3D 黑色 VR 教学空间。
-  // 旧 HTML 按钮不再作为主要入口，只保留兼容：如果按钮仍存在，点击也进入游戏。
+  // 旧 HTML 按钮不再作为主要入口，只保留兼容：如果按钮仍存在，点击也Enter游戏。
   const controllerBtn = document.querySelector("#enter-controller-btn");
   const gazeBtn = document.querySelector("#enter-gaze-btn");
 
@@ -871,7 +898,7 @@ function preloadAssets() {
 
 
 // ===============================
-// 加载流程：进度条结束后进入控制方式检测
+// 加载流程：进度条结束后Enter控制方式检测
 // ===============================
 
 function initLoadingFlow() {
@@ -901,7 +928,7 @@ function initLoadingFlow() {
       clearInterval(timer);
 
       setTimeout(() => {
-        // 不再显示“正在检测手柄”的中间页面，检测在后台完成
+        // 不再显示“正在检测手柄”的中间页面，检测在后台Done
         if (loadingPanel) loadingPanel.classList.add("hidden");
         if (detectPanel) detectPanel.classList.add("hidden");
 
@@ -914,7 +941,7 @@ function initLoadingFlow() {
           setControlMode("gaze");
         }
 
-        // 加载完成后直接进入“第0关”黑色 VR 教学空间
+        // 加载Done后直接Enter“第0关”黑色 VR 教学空间
         enterScene();
       }, 250);
     }
@@ -994,21 +1021,21 @@ function showVRGuideScene() {
   guideRoot.appendChild(guideControllerPlane);
   guideRoot.appendChild(guideGazePlane);
 
-// 左侧手柄教学图里的 OK 区域：点击可进入，手柄 A 也可进入
+// 左侧手柄教学图里的 OK 区域：点击可Enter，手柄 A 也可Enter
 createGuideOkButton({
   parentPanel: guideControllerPlane,
   mode: "gamepad",
   position: `${GUIDE_OK_X} ${GUIDE_OK_Y} ${GUIDE_OK_Z}`
 });
 
-// 右侧眼神教学图里的 OK 区域：凝视 3 秒进入
+// 右侧眼神教学图里的 OK 区域：凝视 3 秒Enter
 guideEnterButton = createGuideOkButton({
   parentPanel: guideGazePlane,
   mode: "gaze",
   position: `${GUIDE_OK_X} ${GUIDE_OK_Y} ${GUIDE_OK_Z}`
 });
 
-  // 保证进入教学空间时 look-controls 仍然可用，电脑端鼠标拖拽视角能移动
+  // 保证Enter教学空间时 look-controls 仍然可用，电脑端鼠标拖拽视角能移动
   cameraEl.setAttribute("look-controls", "enabled: true");
   const canvas = sceneEl.canvas || document.querySelector("canvas");
   if (canvas) {
@@ -1282,7 +1309,7 @@ function updateGuideGazeRaycast() {
 
 function updateGuideInfo(text) {
   // 教学空间的说明已经写在图片里，不再显示左上角信息，避免干扰画面。
-  // 进入正式关卡后，updateInfo() 会继续正常显示关卡提示。
+  // Enter正式关卡后，updateInfo() 会继续正常显示关卡提示。
   if (isGuideVisible) return;
 
   const infoPanel = document.querySelector("#info");
@@ -1305,7 +1332,7 @@ function enterSceneFromGuide() {
     return;
   }
 
-  // 进入第一关也使用白色渐显/渐隐，让教学空间自然过渡到真实关卡
+  // Enter第一关也使用白色渐显/渐隐，让教学空间自然过渡到真实关卡
   fogOverlay.style.display = "block";
   fogOverlay.style.transition = "opacity 1.2s ease-in-out";
   fogOverlay.style.opacity = "1";
@@ -1338,7 +1365,7 @@ function setupImageFallbacks() {
 function enterScene() {
   if (hasEnteredScene) return;
 
-  // A-Frame 场景和摄像机有时比 loading 稍慢，没准备好就等一下再进入。
+  // A-Frame 场景和摄像机有时比 loading 稍慢，没准备好就等一下再Enter。
   if (!sceneEl || !cameraEl || !cameraObject || !levelRoot) {
     setTimeout(enterScene, 120);
     return;
@@ -1367,7 +1394,7 @@ function enterScene() {
     }
   }
 
-  // 先进入第0关教学空间，而不是直接进入 floor1。
+  // 先Enter第0关教学空间，而不是直接Enter floor1。
   currentLevelIndex = 0;
   loadGuideLevel();
 }
@@ -1479,7 +1506,20 @@ function setVisualOpacity(target, opacity) {
     return;
   }
 
-  // A-Frame Entity
+  // A-Frame entity 里手动 setObject3D("mesh", mesh) 的情况
+  // 结尾页按钮就是这种，所以必须优先处理它
+  if (target.getObject3D) {
+    const mesh = target.getObject3D("mesh");
+
+    if (mesh && mesh.material) {
+      mesh.material.opacity = opacity;
+      mesh.material.transparent = opacity < 1;
+      mesh.material.needsUpdate = true;
+      return;
+    }
+  }
+
+  // 普通 A-Frame Entity
   if (target.setAttribute) {
     target.setAttribute("material", "opacity", opacity);
   }
@@ -1561,10 +1601,10 @@ function loadGuideLevel() {
 
   if (controlMode === "gamepad") {
     selectedIndex = 0;
-    updateInfo("教学页 | 手柄模式：按 A 进入第一关");
+    updateInfo("教学页 | 手柄模式：按 A Enter第一关");
   } else {
     selectedIndex = -1;
-    updateInfo(`教学页 | 凝视中间白色圆球 ${GAZE_CONFIRM_SECONDS} 秒进入第一关`);
+    updateInfo(`教学页 | 凝视中间白色圆球 ${GAZE_CONFIRM_SECONDS} 秒Enter第一关`);
   }
 
   updateObjectVisualStates();
@@ -1581,7 +1621,7 @@ function createGuideEnterButton() {
 
   group.objectData = {
     type: "guide-enter-button",
-    label: "进入",
+    label: "Enter",
     followCamera: false,
     basePosition: enterPosition.clone(),
     baseScale: 1,
@@ -1602,7 +1642,7 @@ function createGuideEnterButton() {
   sphere.object3D.renderOrder = 25;
   group.appendChild(sphere);
 
-  const label = createTextLabel("进入");
+  const label = createTextLabel("Enter");
   label.setAttribute("position", "0 -0.62 0.04");
   label.object3D.renderOrder = 4;
   group.appendChild(label);
@@ -1695,7 +1735,7 @@ function clearInteractiveObjects() {
 
 
 // ===============================
-// 创建完成按钮
+// 创建Done按钮
 // ===============================
 
 function createFinishButton() {
@@ -1707,14 +1747,14 @@ function createFinishButton() {
 
   group.objectData = {
     type: "finish-button",
-    label: "完成",
+    label: "Done",
     followCamera: false,
     basePosition: finishPosition.clone(),
     baseScale: 1,
     floatOffset: 9
   };
 
-  // 完成按钮：实心圆，避免视线扫到圆环中空处导致凝视中断
+  // Done按钮：实心圆，避免视线扫到圆环中空处导致凝视中断
   const ring = document.createElement("a-circle");
   ring.classList.add("interactive-hitbox");
   ring.setAttribute("radius", "0.38");
@@ -1727,7 +1767,7 @@ function createFinishButton() {
   ring.object3D.renderOrder = 25;
   group.appendChild(ring);
 
-  const label = createTextLabel("完成");
+  const label = createTextLabel("Done");
   label.setAttribute("position", "0 -0.62 0.04");
   label.object3D.renderOrder = 4;
   group.appendChild(label);
@@ -1794,7 +1834,7 @@ function createTextLabel(text) {
   roundRect(context, 36, 44, 440, 92, 46);
   context.fill();
 
-  context.font = "bold 44px Arial";
+  context.font = '44px "AkzidenzCondensed", Arial';
   context.fillStyle = "white";
   context.textAlign = "center";
   context.textBaseline = "middle";
@@ -1845,7 +1885,7 @@ function roundRect(context, x, y, width, height, radius) {
 
 function setupInteractiveEvents(group) {
   const bindEvents = (target) => {
-    // 视线进入：进入预选，并开始凝视计时
+    // 视线Enter：Enter预选，并开始凝视计时
     target.addEventListener("mouseenter", () => {
       if (!hasEnteredScene || controlMode !== "gaze") return;
 
@@ -1867,9 +1907,9 @@ function setupInteractiveEvents(group) {
         selectedIndex = -1;
         updateObjectVisualStates();
         if (currentLevelName === "guide") {
-          updateInfo(`教学页 | 凝视中间白色圆球 ${GAZE_CONFIRM_SECONDS} 秒进入第一关`);
+          updateInfo(`教学页 | 凝视中间白色圆球 ${GAZE_CONFIRM_SECONDS} 秒Enter第一关`);
         } else {
-          updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象进行预选`);
+          updateInfo(`${levelDisplayNames[currentLevelName]} | Look at an image to preview`);
         }
       }
 
@@ -1960,11 +2000,15 @@ function ensureGazeProgressRing(entity) {
 
   const data = entity.objectData;
 
-  // 只给“第0关进入按钮”和“正式关卡完成按钮”加环形进度
+  // 只给“第0关Enter按钮”和“正式关卡Done按钮”加环形进度
   // 普通意象图片不加，避免画面太乱
-  if (data.type !== "guide-enter-button" && data.type !== "finish-button") {
-    return null;
-  }
+  if (
+  data.type !== "guide-enter-button" &&
+  data.type !== "finish-button" &&
+  data.type !== "ending-replay-button"
+) {
+  return null;
+}
 
   if (data.gazeProgressRing) {
     return data.gazeProgressRing;
@@ -2048,13 +2092,18 @@ function updateGazeProgressInfo(entity, progress) {
   const data = entity.objectData;
   const percent = Math.round(progress * 100);
 
+  if (data.type === "ending-replay-button") {
+  updateInfo(`Finale | Gaze to replay ${data.label} ${percent}%`);
+  return;
+}
+
   if (data.type === "guide-enter-button") {
-    updateInfo(`${levelDisplayNames[currentLevelName]} | 凝视进入 ${percent}% | 满 ${GAZE_CONFIRM_SECONDS} 秒进入第一关`);
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 凝视Enter ${percent}% | 满 ${GAZE_CONFIRM_SECONDS} 秒Enter第一关`);
     return;
   }
 
   if (data.type === "finish-button") {
-    updateInfo(`${levelDisplayNames[currentLevelName]} | 凝视完成 ${percent}% | 满 ${GAZE_CONFIRM_SECONDS} 秒进入下一关`);
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 凝视Done ${percent}% | 满 ${GAZE_CONFIRM_SECONDS} 秒Enter下一关`);
     return;
   }
 
@@ -2073,6 +2122,21 @@ function updateGazeProgressInfo(entity, progress) {
 
 function moveSelection(direction) {
   if (selectableObjects.length === 0) return;
+
+  if (currentLevelName === "ending") {
+  selectedIndex += direction;
+
+  if (selectedIndex < 0) {
+    selectedIndex = selectableObjects.length - 1;
+  }
+
+  if (selectedIndex >= selectableObjects.length) {
+    selectedIndex = 0;
+  }
+
+  updateSelectionInfo();
+  return;
+}
 
   const soundObjectCount = selectableObjects.filter((object) => {
     return object.type === "sound-object";
@@ -2122,13 +2186,18 @@ function updateSelectionInfo() {
   const soundId = data.id;
   const isConfirmed = soundId && confirmedSoundIds.has(soundId);
 
+  if (type === "ending-replay-button") {
+  updateInfo(`Finale | Preview: ${label} | Confirm to replay`);
+  return;
+}
+
   if (type === "guide-enter-button") {
-    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前预选：进入 | 确认后进入第一关`);
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前预选：Enter | 确认后Enter第一关`);
     return;
   }
 
   if (type === "finish-button") {
-    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前预选：完成 | 确认后进入下一关`);
+    updateInfo(`${levelDisplayNames[currentLevelName]} | 当前预选：Done | 确认后Enter下一关`);
     return;
   }
 
@@ -2161,6 +2230,12 @@ function handleAButtonClick() {
 
   const data = selectedObject.el.objectData;
 
+  if (data.type === "ending-replay-button") {
+  playEndingReplay(data.levelName);
+  updateObjectVisualStates();
+  return;
+}
+
   if (data.type === "guide-enter-button") {
     enterFirstLevelFromGuide();
     return;
@@ -2174,7 +2249,7 @@ function handleAButtonClick() {
   if (data.type === "finish-button") {
     if (!hasConfirmedObjectInCurrentLevel()) {
       showFinishHint(selectedObject.el);
-      updateInfo(`${levelDisplayNames[currentLevelName]} | 请至少选择一个意象后再完成`);
+      updateInfo(`${levelDisplayNames[currentLevelName]} | 请至少选择一个意象后再Done`);
       return;
     }
 
@@ -2210,7 +2285,7 @@ function showFinishHint(finishEntity) {
   if (!finishEntity) return;
 
   if (!finishHintEl) {
-    finishHintEl = createSmallHintText("请选择一个或以上的意象组成乐曲");
+    finishHintEl = createSmallHintText("Select at least one image first");
     finishEntity.appendChild(finishHintEl);
   }
 
@@ -2683,6 +2758,8 @@ function stopSound(soundId) {
 }
 
 function stopAllSoundsAndClearConfirmState() {
+  stopEndingReplaySounds();
+
   Object.values(activeAudios).forEach((audio) => {
     audio.pause();
     audio.currentTime = 0;
@@ -2694,12 +2771,27 @@ function stopAllSoundsAndClearConfirmState() {
   confirmedSoundIds.clear();
 }
 
+function saveCurrentLevelSoundSelection() {
+  if (!levelData[currentLevelName]) return;
+
+  const currentObjects = levelData[currentLevelName].objects || [];
+
+  finalSoundRecords[currentLevelName] = currentObjects
+    .filter((item) => confirmedSoundIds.has(item.id))
+    .map((item) => item.id);
+
+  console.log("Saved final sound composition:", currentLevelName, finalSoundRecords[currentLevelName]);
+}
+
 // ===============================
 // 关卡切换
 // ===============================
 
 function goToNextLevel() {
   if (isLevelTransitioning) return;
+
+  // 关键：先保存当前关卡最终选择，再清空声音
+  saveCurrentLevelSoundSelection();
 
   stopAllSoundsAndClearConfirmState();
 
@@ -2709,8 +2801,39 @@ function goToNextLevel() {
 
     transitionToLevel(nextLevelName);
   } else {
-    showEndingState();
+    transitionToEndingState();
   }
+}
+
+function transitionToEndingState() {
+  if (isLevelTransitioning) return;
+
+  isLevelTransitioning = true;
+
+  const fogOverlay = document.querySelector("#fog-overlay");
+
+  if (!fogOverlay) {
+    showEndingState();
+    isLevelTransitioning = false;
+    return;
+  }
+
+  fogOverlay.style.display = "block";
+  fogOverlay.style.transition = "opacity 1.2s ease-in-out";
+  fogOverlay.style.opacity = "1";
+
+  setTimeout(() => {
+    showEndingState();
+
+    fogOverlay.style.transition = "opacity 1.4s ease-in-out";
+    fogOverlay.style.opacity = "0";
+
+    setTimeout(() => {
+      isLevelTransitioning = false;
+      fogOverlay.style.transition = "";
+      fogOverlay.style.display = "";
+    }, 1400);
+  }, 1400);
 }
 
 function transitionToLevel(levelName) {
@@ -2750,14 +2873,472 @@ function transitionToLevel(levelName) {
 
 function showEndingState() {
   clearInteractiveObjects();
+  cancelGazeConfirm();
+  stopEndingReplaySounds();
 
-  updateInfo("三首声音已经完成。之后可以在这里制作总结页面，回放三关的声音作品。");
+  currentLevelName = "ending";
+  selectedIndex = 0;
 
-  const fogOverlay = document.querySelector("#fog-overlay");
-  fogOverlay.style.transition = "opacity 0.8s ease";
-  fogOverlay.style.opacity = "0.18";
+  // 保留 F3 全景作为背景
+  setPanorama("floor3");
 
-  console.log("每关记录的声音：", playedSoundRecords);
+  // 用一层半透明遮罩模拟“背景被压暗 / 模糊”的感觉
+  // 真正的实时背景模糊在 A-Frame 里会比较重，这里先做轻量稳定版
+  createEndingScene();
+
+  updateInfo("Finale | Select a sound piece to replay");
+
+  console.log("Final sound records:", finalSoundRecords);
+}
+
+function createEndingScene() {
+  removeEndingScene();
+
+  endingRoot = document.createElement("a-entity");
+endingRoot.setAttribute("id", "ending-scene-root");
+
+// 关键修改：不再挂到 cameraEl 上，而是放到世界空间里。
+// 这样它不会跟着镜头旋转，玩家需要真正看向它才能选择按钮。
+const cameraWorldPosition = new THREE.Vector3();
+const cameraWorldDirection = new THREE.Vector3();
+
+cameraObject.getWorldPosition(cameraWorldPosition);
+cameraObject.getWorldDirection(cameraWorldDirection);
+
+// 窗口距离玩家的远近。数值越大越远。
+const endingPanelDistance = 4.2;
+
+const endingPanelPosition = cameraWorldPosition
+  .clone()
+  .add(cameraWorldDirection.clone().multiplyScalar(-endingPanelDistance));
+
+endingRoot.objectData = {
+  type: "ending-root",
+  basePosition: endingPanelPosition.clone(),
+  floatOffset: Math.random() * 10
+};
+
+endingRoot.object3D.position.copy(endingPanelPosition);
+endingRoot.object3D.lookAt(cameraWorldPosition);
+
+levelRoot.appendChild(endingRoot);
+
+  // 暗化背景层
+  const dimLayer = document.createElement("a-plane");
+  dimLayer.setAttribute("width", "8.4");
+  dimLayer.setAttribute("height", "5.2");
+  dimLayer.setAttribute("position", "0 0 -0.08");
+  dimLayer.setAttribute(
+    "material",
+    "shader: flat; color: #000000; transparent: true; opacity: 0.42; depthWrite: false; depthTest: false; side: double"
+  );
+  dimLayer.object3D.renderOrder = 90;
+  endingRoot.appendChild(dimLayer);
+
+  // 毛玻璃主面板
+  const glassPanel = createEndingGlassPanel();
+  glassPanel.setAttribute("position", "0 0 0");
+  endingRoot.appendChild(glassPanel);
+
+  // 三个回放按钮
+  const buttonData = [
+    {
+      levelName: "floor1",
+      title: "F1",
+      subtitle: "Hallway Sound Piece",
+      x: -1.65
+    },
+    {
+      levelName: "floor2",
+      title: "F2",
+      subtitle: "Outdoor Sound Piece",
+      x: 0
+    },
+    {
+      levelName: "floor3",
+      title: "F3",
+      subtitle: "Atrium Sound Piece",
+      x: 1.65
+    }
+  ];
+
+  buttonData.forEach((data) => {
+    const button = createEndingReplayButton(data);
+    endingRoot.appendChild(button);
+
+    const objectRecord = {
+      el: button,
+      type: "ending-replay-button",
+      id: data.levelName
+    };
+
+    interactiveObjects.push(objectRecord);
+    selectableObjects.push(objectRecord);
+  });
+
+  selectedIndex = 0;
+  updateObjectVisualStates();
+}
+
+function removeEndingScene() {
+  stopEndingReplaySounds();
+
+  if (endingRoot) {
+    endingRoot.remove();
+    endingRoot = null;
+  }
+}
+
+function updateEndingRootVisual() {
+  if (!endingRoot || !endingRoot.objectData || !cameraObject) return;
+
+  const data = endingRoot.objectData;
+  const basePosition = data.basePosition;
+
+  if (!basePosition) return;
+
+  const time = performance.now() * 0.001;
+  const floatOffset = data.floatOffset || 0;
+
+  // 微微上下漂浮
+  const floatY = Math.sin(time * 0.85 + floatOffset) * 0.055;
+
+  endingRoot.object3D.position.set(
+    basePosition.x,
+    basePosition.y + floatY,
+    basePosition.z
+  );
+
+  const cameraWorldPosition = new THREE.Vector3();
+  cameraObject.getWorldPosition(cameraWorldPosition);
+
+  // 始终面向玩家
+  endingRoot.object3D.lookAt(cameraWorldPosition);
+}
+
+function createEndingGlassPanel() {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  canvas.width = 1024;
+  canvas.height = 640;
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 外层毛玻璃感底色
+  context.fillStyle = "rgba(255, 255, 255, 0.22)";
+  roundRect(context, 56, 48, 912, 544, 42);
+  context.fill();
+
+  // 内层轻微高光
+  context.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  context.lineWidth = 3;
+  roundRect(context, 56, 48, 912, 544, 42);
+  context.stroke();
+
+  // 标题
+  context.fillStyle = "rgba(255, 255, 255, 1)";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+
+  context.font = '64px "AkzidenzCondensed", Arial';
+  context.fillText("The Sound Pieces Are Complete", canvas.width / 2, 150);
+
+  context.font = '30px "AkzidenzCondensed", Arial';
+  context.fillStyle = "rgba(255, 255, 255, 0.9)";
+  context.fillText("Replay the compositions you made on each floor.", canvas.width / 2, 210);
+
+  context.font = '24px "AkzidenzCondensed", Arial';
+  context.fillStyle = "rgba(255, 255, 255, 0.78)";
+  context.fillText("Gaze to play / Use joystick and A button", canvas.width / 2, 510);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    opacity: 1,
+    depthWrite: false,
+    depthTest: false,
+    toneMapped: false
+  });
+
+  const geometry = new THREE.PlaneGeometry(4.8, 3.0);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.renderOrder = 100;
+
+  const panel = document.createElement("a-entity");
+  panel.setObject3D("mesh", mesh);
+
+  return panel;
+}
+function createCanvasPlaneEntity(canvas, width, height, renderOrder = 100, opacity = 1) {
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+
+  if ("colorSpace" in texture) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+  } else {
+    texture.encoding = THREE.sRGBEncoding;
+  }
+
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    depthTest: false,
+    toneMapped: false,
+    side: THREE.DoubleSide
+  });
+
+  const geometry = new THREE.PlaneGeometry(width, height);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.renderOrder = renderOrder;
+
+  const entity = document.createElement("a-entity");
+  entity.setObject3D("mesh", mesh);
+
+  return entity;
+}
+
+function createInvisibleHitboxEntity(width, height, renderOrder = 130) {
+  const geometry = new THREE.PlaneGeometry(width, height);
+
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+    side: THREE.DoubleSide
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.renderOrder = renderOrder;
+
+  const entity = document.createElement("a-entity");
+  entity.classList.add("interactive-hitbox");
+  entity.setObject3D("mesh", mesh);
+
+  return entity;
+}
+
+function createEndingReplayButton({ levelName, title, subtitle, x }) {
+  const group = document.createElement("a-entity");
+
+  group.classList.add("interactive");
+  group.setAttribute("position", `${x} -0.58 0.08`);
+
+  group.objectData = {
+    type: "ending-replay-button",
+    levelName,
+    label: title,
+    subtitle,
+    baseScale: 1,
+    mainImage: null,
+    glowPlane: null,
+    gazeProgressRing: null
+  };
+
+  // 发光外圈：预选 / 播放时显示
+  const glowPlane = createEndingButtonGlowPlane();
+  glowPlane.setAttribute("position", "0 0 -0.03");
+  group.appendChild(glowPlane);
+  group.objectData.glowPlane = glowPlane;
+
+  // 可见按钮：同时也是凝视命中区
+  // 不再额外创建白色/透明 hitbox，避免出现难看的矩形块
+  const buttonPlane = createEndingButtonPlane({
+    title,
+    subtitle,
+    isActive: false
+  });
+
+  buttonPlane.classList.add("interactive-hitbox");
+  buttonPlane.setAttribute("position", "0 0 0.04");
+
+  group.appendChild(buttonPlane);
+  group.objectData.mainImage = buttonPlane;
+
+  setupInteractiveEvents(group);
+
+  return group;
+}
+
+function createEndingButtonPlane({ title, subtitle, isActive }) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  canvas.width = 720;
+  canvas.height = 380;
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 阴影：让按钮微微浮起来
+  context.shadowColor = "rgba(0, 0, 0, 0.24)";
+  context.shadowBlur = 28;
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 12;
+
+  // P2 风格：浅灰毛玻璃圆角底
+  context.fillStyle = isActive
+    ? "rgba(245, 245, 245, 0.88)"
+    : "rgba(232, 232, 232, 0.76)";
+
+  roundRect(context, 72, 74, 576, 232, 42);
+  context.fill();
+
+  // 关闭阴影，避免文字糊
+  context.shadowColor = "transparent";
+  context.shadowBlur = 0;
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 0;
+
+  // 细白边框
+  context.strokeStyle = isActive
+    ? "rgba(255, 255, 255, 1)"
+    : "rgba(255, 255, 255, 0.78)";
+
+  context.lineWidth = isActive ? 4 : 3;
+  roundRect(context, 72, 74, 576, 232, 42);
+  context.stroke();
+
+  // 内层高光
+  context.strokeStyle = "rgba(255, 255, 255, 0.46)";
+  context.lineWidth = 2;
+  roundRect(context, 86, 88, 548, 204, 34);
+  context.stroke();
+
+  // 只保留 F1 / F2 / F3
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+
+  context.font = '118px "AkzidenzCondensed", Arial';
+  context.fillStyle = "rgba(8, 8, 8, 0.96)";
+  context.fillText(title, canvas.width / 2, canvas.height / 2 + 6);
+
+  return createCanvasPlaneEntity(canvas, 1.42, 0.75, 120, 1);
+}
+
+
+function createEndingButtonGlowPlane() {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  canvas.width = 760;
+  canvas.height = 420;
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  context.shadowColor = "rgba(255, 255, 255, 0.9)";
+  context.shadowBlur = 34;
+  context.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  context.lineWidth = 4;
+
+  roundRect(context, 74, 84, 612, 252, 48);
+  context.stroke();
+
+  const glow = createCanvasPlaneEntity(canvas, 1.56, 0.86, 118, 0);
+  glow.setAttribute("visible", false);
+
+  return glow;
+}
+
+
+function getSoundItemById(soundId) {
+  for (const levelName of Object.keys(levelData)) {
+    const found = levelData[levelName].objects.find((item) => item.id === soundId);
+    if (found) return found;
+  }
+
+  return null;
+}
+
+function playEndingReplay(levelName) {
+
+if (endingActiveReplayLevel === levelName) {
+  stopEndingReplaySounds();
+  updateInfo(`Finale | Stopped ${levelDisplayNames[levelName]}`);
+  updateEndingButtonStates();
+  return;
+}
+
+  stopEndingReplaySounds();
+
+  const soundIds = finalSoundRecords[levelName] || [];
+
+  if (soundIds.length === 0) {
+    updateInfo(`Finale | No saved sound piece for ${levelDisplayNames[levelName]}`);
+    return;
+  }
+
+  endingActiveReplayLevel = levelName;
+
+  // 如果你有每层背景音乐，也一起作为回放底层播放
+  if (typeof levelBackgroundMusic !== "undefined" && levelBackgroundMusic[levelName]) {
+    const bgConfig = levelBackgroundMusic[levelName];
+    const bgAudio = new Audio(bgConfig.src);
+
+    bgAudio.loop = true;
+    bgAudio.volume = Math.max(0, Math.min(1, Number(bgConfig.volume ?? 0.25)));
+
+    endingReplayAudios.push(bgAudio);
+
+    bgAudio.play().catch((error) => {
+      console.warn("Ending background replay failed:", levelName, error);
+    });
+  }
+
+  soundIds.forEach((soundId) => {
+    const item = getSoundItemById(soundId);
+
+    if (!item || !item.audioSrc) return;
+
+    const audio = new Audio(item.audioSrc);
+    audio.loop = true;
+    audio.volume = Math.max(0, Math.min(1, Number(item.volume ?? 0.75)));
+
+    endingReplayAudios.push(audio);
+
+    audio.play().catch((error) => {
+      console.warn("Ending sound replay failed:", soundId, error);
+    });
+  });
+
+  updateInfo(`Finale | Replaying ${levelDisplayNames[levelName]}`);
+  updateEndingButtonStates();
+}
+
+function stopEndingReplaySounds() {
+  endingReplayAudios.forEach((audio) => {
+    audio.pause();
+    audio.currentTime = 0;
+  });
+
+  endingReplayAudios = [];
+  endingActiveReplayLevel = null;
+}
+
+function updateEndingButtonStates() {
+  if (!endingRoot) return;
+
+  selectableObjects.forEach((objectRecord) => {
+    const entity = objectRecord.el;
+    const data = entity.objectData;
+
+    if (!data || data.type !== "ending-replay-button") return;
+
+    const isActive = data.levelName === endingActiveReplayLevel;
+
+    if (data.glowPlane) {
+      data.glowPlane.setAttribute("visible", isActive);
+      setVisualOpacity(data.glowPlane, isActive ? 0.95 : 0);
+    }
+  });
+
+  updateObjectVisualStates();
 }
 
 
@@ -2783,15 +3364,15 @@ function setControlMode(mode) {
       }
       updateObjectVisualStates();
       if (currentLevelName === "guide") {
-        updateInfo("教学页 | 手柄模式：按 A 进入第一关");
+        updateInfo("教学页 | 手柄模式：按 A Enter第一关");
       } else {
-        updateInfo("手柄模式：左摇杆切换 / 向下选择完成 / A确认");
+        updateInfo("手柄模式：左摇杆切换 / 向下选择Done / A确认");
       }
     } else {
       selectedIndex = -1;
       updateObjectVisualStates();
       if (currentLevelName === "guide") {
-        updateInfo(`教学页 | 凝视中间白色圆球 ${GAZE_CONFIRM_SECONDS} 秒进入第一关`);
+        updateInfo(`教学页 | 凝视中间白色圆球 ${GAZE_CONFIRM_SECONDS} 秒Enter第一关`);
       } else {
         updateInfo(`${levelDisplayNames[currentLevelName]} | 请看向一个意象，凝视 ${GAZE_CONFIRM_SECONDS} 秒确认`);
       }
@@ -2863,8 +3444,8 @@ function checkGamepadInput() {
     gamepadIndex = gamepad.index;
   }
 
-  // 黑色教学空间 / 未进入关卡时：两张教学图同时显示。
-  // 如果检测到手柄输入，就暗中切到手柄模式；按 A 进入游戏。
+  // 黑色教学空间 / 未Enter关卡时：两张教学图同时显示。
+  // 如果检测到手柄输入，就暗中切到手柄模式；按 A Enter游戏。
   if (!hasEnteredScene) {
     if (isMeaningfulGamepadInput(gamepad)) {
       gamepadIndex = gamepad.index;
@@ -2880,7 +3461,7 @@ function checkGamepadInput() {
     return;
   }
 
-  // 已进入场景后：只要检测到手柄输入，就自动切到手柄模式。
+  // 已Enter场景后：只要检测到手柄输入，就自动切到手柄模式。
   // 这一步是为了修复自制分屏后，手机端手柄连接但仍停在 gaze 模式的问题。
   if (controlMode !== "gamepad" && isMeaningfulGamepadInput(gamepad)) {
     setControlMode("gamepad");
@@ -2948,7 +3529,7 @@ function getActiveGamepad() {
 
 function setupKeyboardInput() {
   window.addEventListener("keydown", (event) => {
-    // 教学页：按 Enter 进入场景
+    // 教学页：按 Enter Enter场景
     if (event.code === "Enter" && !hasEnteredScene) {
       enterSceneFromGuide();
       return;
@@ -2996,7 +3577,10 @@ function setupKeyboardInput() {
 function updateLoop() {
   checkGamepadInput();
 
-  // 第0关教学页已经并入正式关卡系统，不再使用旧教学页 raycaster。
+  // 结尾页窗口固定在世界空间里，但始终面向玩家并微微漂浮
+  if (currentLevelName === "ending") {
+    updateEndingRootVisual();
+  }
 
   if (hasEnteredScene) {
     updateObjectVisualStates();
@@ -3021,7 +3605,28 @@ function updateObjectVisualStates() {
 
     const isSelected = index === selectedIndex;
     const isConfirmed = data.id && confirmedSoundIds.has(data.id);
-    const isFinishButton = data.type === "finish-button" || data.type === "guide-enter-button";
+    const isEndingButton = data.type === "ending-replay-button";
+const isFinishButton = data.type === "finish-button" || data.type === "guide-enter-button";
+
+if (isEndingButton) {
+  const isActive = data.levelName === endingActiveReplayLevel;
+  const endingScale = isSelected ? 1.08 : 1;
+
+  entity.object3D.scale.set(endingScale, endingScale, endingScale);
+
+  if (data.mainImage) {
+    setVisualOpacity(data.mainImage, isSelected ? 1 : 0.88);
+  }
+
+  if (data.glowPlane) {
+    const shouldGlow = isSelected || isActive;
+
+    data.glowPlane.setAttribute("visible", shouldGlow);
+    setVisualOpacity(data.glowPlane, isActive ? 0.95 : 0.55);
+  }
+
+  return;
+}
 
     // ===============================
     // 位置与朝向
@@ -3046,7 +3651,7 @@ function updateObjectVisualStates() {
     }
 
     // ===============================
-    // 完成按钮
+    // Done按钮
     // ===============================
     if (isFinishButton) {
       const finishScale = isSelected ? 1.28 : 1;
