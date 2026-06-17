@@ -3066,18 +3066,6 @@ endingRoot.object3D.lookAt(cameraWorldPosition);
 
 levelRoot.appendChild(endingRoot);
 
-  // 暗化背景层
-  const dimLayer = document.createElement("a-plane");
-  dimLayer.setAttribute("width", "8.4");
-  dimLayer.setAttribute("height", "5.2");
-  dimLayer.setAttribute("position", "0 0 -0.08");
-  dimLayer.setAttribute(
-    "material",
-    "shader: flat; color: #000000; transparent: true; opacity: 0.42; depthWrite: false; depthTest: false; side: double"
-  );
-  dimLayer.object3D.renderOrder = 90;
-  endingRoot.appendChild(dimLayer);
-
   // 毛玻璃主面板
   const glassPanel = createEndingGlassPanel();
   glassPanel.setAttribute("position", "0 0 0");
@@ -3193,54 +3181,71 @@ function createEndingGlassPanel() {
 
   context.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 外层毛玻璃感底色
-  context.fillStyle = "rgba(255, 255, 255, 0.22)";
-  roundRect(context, 56, 48, 912, 544, 42);
+  // ===============================
+  // 和彩蛋卡片统一的浅色毛玻璃质感
+  // ===============================
+
+  // 外层柔和白色发光
+  context.shadowColor = "rgba(255, 255, 255, 0.38)";
+  context.shadowBlur = 44;
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 0;
+
+  // 主卡片底色：比原来更实，不再灰蒙蒙
+  context.fillStyle = "rgba(238, 238, 238, 0.82)";
+  roundRect(context, 56, 48, 912, 544, 54);
   context.fill();
 
-  // 内层轻微高光
-  context.strokeStyle = "rgba(255, 255, 255, 0.9)";
-  context.lineWidth = 3;
-  roundRect(context, 56, 48, 912, 544, 42);
+  // 关闭阴影，避免影响后面的文字和线条
+  context.shadowColor = "transparent";
+  context.shadowBlur = 0;
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 0;
+
+  // 外层白色细边框
+  context.strokeStyle = "rgba(255, 255, 255, 0.96)";
+  context.lineWidth = 4;
+  roundRect(context, 56, 48, 912, 544, 54);
   context.stroke();
 
-  // 标题
-  context.fillStyle = "rgba(255, 255, 255, 1)";
+  // 内层高光线
+  context.strokeStyle = "rgba(255, 255, 255, 0.46)";
+  context.lineWidth = 2;
+  roundRect(context, 78, 70, 868, 500, 44);
+  context.stroke();
+
+  // 顶部轻微高光，让面板更像玻璃
+  const highlight = context.createLinearGradient(0, 70, 0, 270);
+  highlight.addColorStop(0, "rgba(255, 255, 255, 0.34)");
+  highlight.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+  context.fillStyle = highlight;
+  roundRect(context, 78, 70, 868, 210, 44);
+  context.fill();
+
+  // ===============================
+  // 文字：改成深色，保证手机上看得清楚
+  // ===============================
+
   context.textAlign = "center";
   context.textBaseline = "middle";
 
   context.font = '64px "AkzidenzCondensed", Arial';
+  context.fillStyle = "rgba(10, 10, 10, 0.94)";
   context.fillText("The Sound Pieces Are Complete", canvas.width / 2, 150);
 
   context.font = '30px "AkzidenzCondensed", Arial';
-  context.fillStyle = "rgba(255, 255, 255, 0.9)";
+  context.fillStyle = "rgba(20, 20, 20, 0.72)";
   context.fillText("Replay the compositions you made on each floor.", canvas.width / 2, 210);
 
   context.font = '24px "AkzidenzCondensed", Arial';
-  context.fillStyle = "rgba(255, 255, 255, 0.78)";
+  context.fillStyle = "rgba(20, 20, 20, 0.48)";
   context.fillText("Gaze to play / Use joystick and A button", canvas.width / 2, 510);
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-
-  const material = new THREE.MeshBasicMaterial({
-    map: texture,
-    transparent: true,
-    opacity: 1,
-    depthWrite: false,
-    depthTest: false,
-    toneMapped: false
-  });
-
-  const geometry = new THREE.PlaneGeometry(4.8, 3.0);
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.renderOrder = 100;
-
-  const panel = document.createElement("a-entity");
-  panel.setObject3D("mesh", mesh);
-
-  return panel;
+  return createCanvasPlaneEntity(canvas, 4.8, 3.0, 100, 1);
 }
+
+
 function createCanvasPlaneEntity(canvas, width, height, renderOrder = 100, opacity = 1) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
@@ -3344,18 +3349,20 @@ function createEndingButtonPlane({ title, subtitle, isActive }) {
 
   context.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 阴影：让按钮微微浮起来
-  context.shadowColor = "rgba(0, 0, 0, 0.24)";
-  context.shadowBlur = 28;
+  // 白色发光阴影：和最终主浮窗、彩蛋保持一致
+  context.shadowColor = isActive
+    ? "rgba(255, 255, 255, 0.72)"
+    : "rgba(255, 255, 255, 0.34)";
+  context.shadowBlur = isActive ? 42 : 28;
   context.shadowOffsetX = 0;
-  context.shadowOffsetY = 12;
+  context.shadowOffsetY = 0;
 
-  // P2 风格：浅灰毛玻璃圆角底
+  // 按钮底色：不再偏灰，变成更亮的浅色毛玻璃
   context.fillStyle = isActive
-    ? "rgba(245, 245, 245, 0.88)"
-    : "rgba(232, 232, 232, 0.76)";
+    ? "rgba(255, 255, 255, 0.94)"
+    : "rgba(238, 238, 238, 0.82)";
 
-  roundRect(context, 72, 74, 576, 232, 42);
+  roundRect(context, 72, 74, 576, 232, 46);
   context.fill();
 
   // 关闭阴影，避免文字糊
@@ -3364,20 +3371,29 @@ function createEndingButtonPlane({ title, subtitle, isActive }) {
   context.shadowOffsetX = 0;
   context.shadowOffsetY = 0;
 
-  // 细白边框
+  // 外层白色边框
   context.strokeStyle = isActive
     ? "rgba(255, 255, 255, 1)"
-    : "rgba(255, 255, 255, 0.78)";
+    : "rgba(255, 255, 255, 0.9)";
 
-  context.lineWidth = isActive ? 4 : 3;
-  roundRect(context, 72, 74, 576, 232, 42);
+  context.lineWidth = isActive ? 5 : 3;
+  roundRect(context, 72, 74, 576, 232, 46);
   context.stroke();
 
   // 内层高光
-  context.strokeStyle = "rgba(255, 255, 255, 0.46)";
+  context.strokeStyle = "rgba(255, 255, 255, 0.48)";
   context.lineWidth = 2;
-  roundRect(context, 86, 88, 548, 204, 34);
+  roundRect(context, 90, 92, 540, 196, 36);
   context.stroke();
+
+  // 顶部柔光
+  const highlight = context.createLinearGradient(0, 80, 0, 190);
+  highlight.addColorStop(0, "rgba(255, 255, 255, 0.34)");
+  highlight.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+  context.fillStyle = highlight;
+  roundRect(context, 90, 92, 540, 108, 36);
+  context.fill();
 
   // 只保留 F1 / F2 / F3
   context.textAlign = "center";
@@ -3400,16 +3416,31 @@ function createEndingButtonGlowPlane() {
 
   context.clearRect(0, 0, canvas.width, canvas.height);
 
-  context.shadowColor = "rgba(255, 255, 255, 0.9)";
-  context.shadowBlur = 34;
-  context.strokeStyle = "rgba(255, 255, 255, 0.95)";
-  context.lineWidth = 4;
+  // 更柔和的白色光晕，不要硬边框
+  context.shadowColor = "rgba(255, 255, 255, 0.62)";
+  context.shadowBlur = 46;
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 0;
 
-  roundRect(context, 74, 84, 612, 252, 48);
+  context.strokeStyle = "rgba(255, 255, 255, 0.58)";
+  context.lineWidth = 3;
+
+  roundRect(context, 86, 96, 588, 228, 46);
   context.stroke();
 
-  const glow = createCanvasPlaneEntity(canvas, 1.56, 0.86, 118, 0);
+  const glow = createCanvasPlaneEntity(canvas, 1.50, 0.82, 118, 0);
   glow.setAttribute("visible", false);
+
+  // 关键：使用加法混合，避免透明区域在手机端显示成黑方块
+  const mesh = glow.getObject3D("mesh");
+  if (mesh && mesh.material) {
+    mesh.material.blending = THREE.AdditiveBlending;
+    mesh.material.transparent = true;
+    mesh.material.depthWrite = false;
+    mesh.material.depthTest = false;
+    mesh.material.toneMapped = false;
+    mesh.material.needsUpdate = true;
+  }
 
   return glow;
 }
@@ -3523,9 +3554,9 @@ function updateEndingButtonStates() {
     const isActive = data.levelName === endingActiveReplayLevel;
 
     if (data.glowPlane) {
-      data.glowPlane.setAttribute("visible", isActive);
-      setVisualOpacity(data.glowPlane, isActive ? 0.95 : 0);
-    }
+  data.glowPlane.setAttribute("visible", isActive);
+  setVisualOpacity(data.glowPlane, isActive ? 0.42 : 0);
+}
   });
 
   updateObjectVisualStates();
@@ -3810,11 +3841,11 @@ if (isEndingButton) {
   }
 
   if (data.glowPlane) {
-    const shouldGlow = isSelected || isActive;
+  const shouldGlow = isSelected || isActive;
 
-    data.glowPlane.setAttribute("visible", shouldGlow);
-    setVisualOpacity(data.glowPlane, isActive ? 0.95 : 0.55);
-  }
+  data.glowPlane.setAttribute("visible", shouldGlow);
+  setVisualOpacity(data.glowPlane, isActive ? 0.42 : 0.26);
+}
 
   return;
 }
