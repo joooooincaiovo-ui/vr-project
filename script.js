@@ -57,6 +57,10 @@ let selectedIndex = 0;
 const activeAudios = {};
 const confirmedSoundIds = new Set();
 
+let audioUnlocked = false;
+
+const backgroundAudios = {};
+
 let backgroundAudio = null;
 let backgroundAudioId = null;
 
@@ -415,6 +419,7 @@ function bootProject() {
   setupKeyboardInput();
   setupGamepadEvents();
   setupImageFallbacks();
+  setupMobileAudioUnlock();
 
   requestAnimationFrame(updateLoop);
 
@@ -2221,6 +2226,74 @@ function showFinishHint(finishEntity) {
     }
   }, 2200);
 }
+function setupMobileAudioUnlock() {
+  const unlock = () => {
+    unlockAllAudioForMobile();
+  };
+
+  window.addEventListener("pointerdown", unlock, { once: true });
+  window.addEventListener("touchstart", unlock, { once: true });
+  window.addEventListener("click", unlock, { once: true });
+  window.addEventListener("keydown", unlock, { once: true });
+}
+
+function unlockAllAudioForMobile() {
+  if (audioUnlocked) return;
+
+  audioUnlocked = true;
+
+  console.log("正在解锁手机音频...");
+
+  // 1. 解锁所有意象音频
+  Object.values(levelData).forEach((level) => {
+    level.objects.forEach((item) => {
+      if (!item.audioSrc || activeAudios[item.id]) return;
+
+      const audio = new Audio(item.audioSrc);
+      audio.loop = true;
+      audio.preload = "auto";
+      audio.volume = 0;
+
+      activeAudios[item.id] = audio;
+
+      audio.play()
+        .then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.volume = Math.max(0, Math.min(1, Number(item.volume ?? 0.75)));
+        })
+        .catch((error) => {
+          console.warn("手机音频预解锁失败：", item.id, item.audioSrc, error);
+        });
+    });
+  });
+
+  // 2. 如果你加了每层背景音乐，也一起解锁
+  if (typeof levelBackgroundMusic !== "undefined") {
+    Object.entries(levelBackgroundMusic).forEach(([levelName, config]) => {
+      if (!config || !config.src || backgroundAudios[levelName]) return;
+
+      const audio = new Audio(config.src);
+      audio.loop = true;
+      audio.preload = "auto";
+      audio.volume = 0;
+
+      backgroundAudios[levelName] = audio;
+
+      audio.play()
+        .then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.volume = Math.max(0, Math.min(1, Number(config.volume ?? 0.28)));
+        })
+        .catch((error) => {
+          console.warn("手机背景音乐预解锁失败：", levelName, config.src, error);
+        });
+    });
+  }
+
+  console.log("手机音频解锁流程已执行");
+}
 
 // ===============================
 // 声音逻辑：文件缺失也不影响视觉
@@ -2229,33 +2302,26 @@ function showFinishHint(finishEntity) {
 function playLevelBackgroundMusic(levelName) {
   const config = levelBackgroundMusic[levelName];
 
-  // 每次进入新关卡前，先停掉上一关背景音乐
   stopLevelBackgroundMusic();
 
   if (!config || !config.src) return;
 
   const safeVolume = Math.max(0, Math.min(1, Number(config.volume ?? 0.28)));
 
-  const audio = new Audio(config.src);
-  audio.loop = true;
-  audio.preload = "auto";
+  let audio = backgroundAudios[levelName];
+
+  if (!audio) {
+    audio = new Audio(config.src);
+    audio.loop = true;
+    audio.preload = "auto";
+    backgroundAudios[levelName] = audio;
+  }
+
   audio.volume = safeVolume;
+  audio.currentTime = 0;
 
   backgroundAudio = audio;
   backgroundAudioId = levelName;
-
-  audio.addEventListener("error", () => {
-    const error = audio.error;
-
-    console.warn(
-      `背景音乐加载错误：${levelName}`,
-      {
-        path: config.src,
-        errorCode: error ? error.code : "unknown",
-        message: getAudioErrorMessage(error)
-      }
-    );
-  });
 
   audio.play().catch((error) => {
     console.warn(
@@ -2277,8 +2343,15 @@ function stopLevelBackgroundMusic() {
   backgroundAudio.currentTime = 0;
 
   // 释放资源，避免上一关背景音乐继续占内存
-  backgroundAudio.removeAttribute("src");
-  backgroundAudio.load();
+  function stopLevelBackgroundMusic() {
+  if (!backgroundAudio) return;
+
+  backgroundAudio.pause();
+  backgroundAudio.currentTime = 0;
+
+  backgroundAudio = null;
+  backgroundAudioId = null;
+}
 
   backgroundAudio = null;
   backgroundAudioId = null;
