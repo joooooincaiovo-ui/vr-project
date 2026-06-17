@@ -57,6 +57,32 @@ let selectedIndex = 0;
 const activeAudios = {};
 const confirmedSoundIds = new Set();
 
+let backgroundAudio = null;
+let backgroundAudioId = null;
+
+const levelBackgroundMusic = {
+  // 如果教学页不需要背景音乐，就先不写 guide
+  // guide: {
+  //   src: "./assets/sounds/bg-guide.mp3",
+  //   volume: 0.25
+  // },
+
+  //floor1: {
+   // src: "./assets/sounds/bg-f1.mp3",
+   // volume: 0.05
+  //},
+
+  //floor2: {
+   // src: "./assets/sounds/bg-f2.mp3",
+    //volume: 0.05
+  //},
+
+  //floor3: {
+   // src: "./assets/sounds/bg-f3.mp3",
+   // volume: 0.05
+  //}
+};
+
 let previousAButtonPressed = false;
 let previousStickDirection = 0;
 let lastStickMoveTime = 0;
@@ -173,6 +199,7 @@ const levelData = {
         label: "金鱼",
         soundName: "门口鱼缸水流声",
         audioSrc: "./assets/sounds/f1-01.mp3",
+        volume: 0.75,
         imageSrc: "./assets/f1-images/f1-fish.png",
         solidOutlineSrc: "./assets/f1-images/f1-fish-selected.png",
         position: createPositionByAngle(-45, 8, 5)
@@ -182,6 +209,7 @@ const levelData = {
         label: "蛐蛐",
         soundName: "蝉鸣声",
         audioSrc: "./assets/sounds/f1-02.mp3",
+        volume: 0.75,
         imageSrc: "./assets/f1-images/f1-moth.png",
         solidOutlineSrc: "./assets/f1-images/f1-moth-selected.png",
         position: createPositionByAngle(25, 5, 5)
@@ -191,6 +219,7 @@ const levelData = {
         label: "紫丁香",
         soundName: "寂静中的风声",
         audioSrc: "./assets/sounds/f1-03.mp3",
+        volume: 0.75,
         imageSrc: "./assets/f1-images/f1-flower.png",
         solidOutlineSrc: "./assets/f1-images/f1-flower-selected.png",
         position: createPositionByAngle(90, 10, 5)
@@ -200,6 +229,7 @@ const levelData = {
         label: "红门",
         soundName: "雨声",
         audioSrc: "./assets/sounds/f1-04.mp3",
+        volume: 0.25,
         imageSrc: "./assets/f1-images/f1-reddoor.png",
         solidOutlineSrc: "./assets/f1-images/f1-reddoor-selected.png",
         position: createPositionByAngle(155, 6, 5)
@@ -209,6 +239,7 @@ const levelData = {
         label: "花砖",
         soundName: "风吹树叶的声音",
         audioSrc: "./assets/sounds/f1-05.mp3",
+        volume: 0.75,
         imageSrc: "./assets/f1-images/f1-tili.png",
         solidOutlineSrc: "./assets/f1-images/f1-tili-selected.png",
         position: createPositionByAngle(-140, 12, 5)
@@ -224,6 +255,7 @@ const levelData = {
       label: "吉他",
       soundName: "吉他",
       audioSrc: "./assets/sounds/f2-01.mp3",
+      volume: 0.45,
       imageSrc: "./assets/f2-images/f2-guitar.png",
       solidOutlineSrc: "./assets/f2-images/f2-guitar-selected.png",
       position: createPositionByAngle(-55, 8, 5)
@@ -233,6 +265,7 @@ const levelData = {
       label: "钢琴键",
       soundName: "钢琴",
       audioSrc: "./assets/sounds/f2-02.mp3",
+      volume: 0.45,
       imageSrc: "./assets/f2-images/f2-piano.png",
       solidOutlineSrc: "./assets/f2-images/f2-piano-selected.png",
       position: createPositionByAngle(15, 7, 5)
@@ -242,6 +275,7 @@ const levelData = {
       label: "玻璃碎片",
       soundName: "舞蹈律动声音",
       audioSrc: "./assets/sounds/f2-03.mp3",
+      volume: 0.75,
       imageSrc: "./assets/f2-images/f2-glass.png",
       solidOutlineSrc: "./assets/f2-images/f2-glass-selected.png",
       position: createPositionByAngle(75, 12, 5)
@@ -251,6 +285,7 @@ const levelData = {
       label: "树叶",
       soundName: "阳光的声音",
       audioSrc: "./assets/sounds/f2-04.mp3",
+      volume: 0.75,
       imageSrc: "./assets/f2-images/f2-leaf.png",
       solidOutlineSrc: "./assets/f2-images/f2-leaf-selected.png",
       position: createPositionByAngle(145, 8, 5)
@@ -260,6 +295,7 @@ const levelData = {
       label: "小石头",
       soundName: "石质乐器的声音",
       audioSrc: "./assets/sounds/f2-05.mp3",
+      volume: 0.75,
       imageSrc: "./assets/f2-images/f2-stone.png",
       solidOutlineSrc: "./assets/f2-images/f2-stone-selected.png",
       position: createPositionByAngle(-145, 5, 5)
@@ -275,6 +311,7 @@ const levelData = {
       label: "绘本",
       soundName: "木地板脚步声",
       audioSrc: "./assets/sounds/f3-01.mp3",
+      volume: 0.75,
       imageSrc: "./assets/f3-images/f3-book.png",
       solidOutlineSrc: "./assets/f3-images/f3-book-selected.png",
       position: createPositionByAngle(-60, 6, 5)
@@ -284,6 +321,7 @@ const levelData = {
       label: "相机",
       soundName: "清晨阳光洒落的声音",
       audioSrc: "./assets/sounds/f3-02.mp3",
+      volume: 0.75,
       imageSrc: "./assets/f3-images/f3-camera.png",
       solidOutlineSrc: "./assets/f3-images/f3-camera-selected.png",
       position: createPositionByAngle(10, 10, 5)
@@ -293,6 +331,7 @@ const levelData = {
       label: "玩偶",
       soundName: "灰尘漂浮的声音",
       audioSrc: "./assets/sounds/f3-03.mp3",
+      volume: 0.55,
       imageSrc: "./assets/f3-images/f3-bear.png",
       solidOutlineSrc: "./assets/f3-images/f3-bear-selected.png",
       position: createPositionByAngle(75, 8, 5)
@@ -302,6 +341,7 @@ const levelData = {
       label: "木制的手",
       soundName: "轻微触碰木头的声音",
       audioSrc: "./assets/sounds/f3-04.mp3",
+      volume: 0.75,
       imageSrc: "./assets/f3-images/f3-woodheand.png",
       solidOutlineSrc: "./assets/f3-images/f3-woodheand-selected.png",
       position: createPositionByAngle(145, 9, 5)
@@ -311,6 +351,7 @@ const levelData = {
       label: "黄门",
       soundName: "细小的生命声",
       audioSrc: "./assets/sounds/f3-05.mp3",
+      volume: 0.75,
       imageSrc: "./assets/f3-images/f3-yellowdoor.png",
       solidOutlineSrc: "./assets/f3-images/f3-yellowdoor-selected.png",
       position: createPositionByAngle(-145, 7, 5)
@@ -1047,20 +1088,23 @@ function createGuideOkButton({ parentPanel, mode, position }) {
   feedback.object3D.renderOrder = 201;
   okGroup.appendChild(feedback);
 
-  const progressCircle = document.createElement("a-circle");
-  progressCircle.setAttribute("radius", "0.18");
-  progressCircle.setAttribute("segments", "64");
-  progressCircle.setAttribute("position", "0 0 0.04");
-  progressCircle.setAttribute("scale", "0.1 0.1 0.1");
-  progressCircle.setAttribute(
-    "material",
-    "shader: flat; color: #ffffff; transparent: true; opacity: 0; depthWrite: false; depthTest: false; side: double"
-  );
-  progressCircle.object3D.renderOrder = 202;
-  okGroup.appendChild(progressCircle);
+  const progressRing = document.createElement("a-ring");
 
-  okGroup.objectData.feedbackPlane = feedback;
-  okGroup.objectData.progressCircle = progressCircle;
+progressRing.setAttribute("radius-inner", "0.18");
+progressRing.setAttribute("radius-outer", "0.24");
+
+// 初始进度 = 0
+progressRing.setAttribute("theta-start", "0");
+progressRing.setAttribute("theta-length", "0");
+
+progressRing.setAttribute(
+  "material",
+  "shader: flat; color: white; transparent: true; opacity: 0.9; side: double"
+);
+
+progressRing.object3D.renderOrder = 302;
+
+okGroup.appendChild(progressRing);
 
   const onEnter = () => {
     if (!isGuideVisible || isGuideEnteringGame) return;
@@ -1126,6 +1170,10 @@ function startGuideGazeEnter(target) {
 
   cancelGuideGazeEnter();
 
+  if (guideGazeTarget?.guideProgressRing) {
+  guideGazeTarget.guideProgressRing.setAttribute("theta-length", 0);
+}
+
   guideGazeTarget = target;
   guideGazeStartTime = performance.now();
 
@@ -1168,23 +1216,38 @@ function cancelGuideGazeEnter(target = null) {
 }
 
 function updateGuideOkVisual(target, progress) {
-  if (!target || !target.objectData) return;
+  if (!target) return;
 
-  const feedback = target.objectData.feedbackPlane;
-  const circle = target.objectData.progressCircle;
+  // 如果还没创建 ring，就创建
+  if (!target.guideProgressRing) {
+    const ring = document.createElement("a-ring");
 
-  const scale = 1 + progress * 0.12;
-  target.object3D.scale.set(scale, scale, scale);
+    ring.setAttribute("radius-inner", "0.18");
+    ring.setAttribute("radius-outer", "0.25");
 
-  if (feedback) {
-    feedback.setAttribute("material", "opacity", progress > 0 ? 0.035 + progress * 0.12 : 0);
+    ring.setAttribute("theta-start", "0");
+    ring.setAttribute("theta-length", "0");
+
+    ring.setAttribute(
+      "material",
+      "shader: flat; color: white; transparent: true; opacity: 0.9; side: double"
+    );
+
+    ring.object3D.renderOrder = 999;
+
+    target.appendChild(ring);
+    target.guideProgressRing = ring;
   }
 
-  if (circle) {
-    const circleScale = 0.15 + progress * 1.65;
-    circle.setAttribute("scale", `${circleScale} ${circleScale} ${circleScale}`);
-    circle.setAttribute("material", "opacity", progress > 0 ? 0.18 + progress * 0.5 : 0);
-  }
+  const ring = target.guideProgressRing;
+
+  // progress = 0 → 1
+  const safeProgress = Math.max(0, Math.min(1, progress || 0));
+
+  // 关键：转成角度
+  const angle = safeProgress * 360;
+
+  ring.setAttribute("theta-length", angle);
 }
 
 function updateGuideGazeRaycast() {
@@ -1580,6 +1643,8 @@ function loadLevel(levelName) {
   const data = levelData[levelName];
   if (!data) return;
 
+  playLevelBackgroundMusic(levelName);
+
   data.objects.forEach((item, index) => {
     const objectEntity = createFloatingObject(item, index);
     levelRoot.appendChild(objectEntity);
@@ -1857,6 +1922,7 @@ function startGazeConfirm(entity) {
   const durationMs = GAZE_CONFIRM_SECONDS * 1000;
 
   updateGazeProgressInfo(entity, 0);
+  updateGazeRingVisual(entity, 0);
 
   gazeProgressTimer = setInterval(() => {
     if (!gazeTargetEl || gazeTargetEl !== entity) return;
@@ -1865,6 +1931,9 @@ function startGazeConfirm(entity) {
     const progress = Math.min(elapsed / durationMs, 1);
 
     updateGazeProgressInfo(entity, progress);
+
+    // 新增：让白色圆球外侧进度环跟随凝视百分比绕圈
+    updateGazeRingVisual(entity, progress);
   }, 80);
 
   gazeTimer = setTimeout(() => {
@@ -1881,6 +1950,71 @@ function startGazeConfirm(entity) {
   }, durationMs);
 }
 
+function ensureGazeProgressRing(entity) {
+  if (!entity || !entity.objectData) return null;
+
+  const data = entity.objectData;
+
+  // 只给“第0关进入按钮”和“正式关卡完成按钮”加环形进度
+  // 普通意象图片不加，避免画面太乱
+  if (data.type !== "guide-enter-button" && data.type !== "finish-button") {
+    return null;
+  }
+
+  if (data.gazeProgressRing) {
+    return data.gazeProgressRing;
+  }
+
+  const ring = document.createElement("a-ring");
+
+  // 这两个数值决定进度环的粗细和大小
+  // radius-inner 越小，环越厚；整体越大越靠外
+  ring.setAttribute("radius-inner", "0.43");
+  ring.setAttribute("radius-outer", "0.50");
+
+  // 从上方开始绕圈
+  ring.setAttribute("theta-start", "90");
+
+  // 初始没有进度
+  ring.setAttribute("theta-length", "0");
+
+  ring.setAttribute("position", "0 0 0.08");
+
+  ring.setAttribute(
+    "material",
+    "shader: flat; color: #ffffff; transparent: true; opacity: 0; depthWrite: false; depthTest: false; side: double"
+  );
+
+  ring.object3D.renderOrder = 80;
+  ring.setAttribute("visible", false);
+
+  entity.appendChild(ring);
+
+  data.gazeProgressRing = ring;
+
+  return ring;
+}
+
+function updateGazeRingVisual(entity, progress) {
+  const ring = ensureGazeProgressRing(entity);
+
+  if (!ring) return;
+
+  const safeProgress = Math.max(0, Math.min(1, progress || 0));
+  const angle = safeProgress * 360;
+
+  ring.setAttribute("theta-length", angle);
+
+  if (safeProgress > 0) {
+    ring.setAttribute("visible", true);
+    ring.setAttribute("material", "opacity", 0.95);
+  } else {
+    ring.setAttribute("theta-length", 0);
+    ring.setAttribute("material", "opacity", 0);
+    ring.setAttribute("visible", false);
+  }
+}
+
 function cancelGazeConfirm(entity = null) {
   if (entity && gazeTargetEl && gazeTargetEl !== entity) return;
 
@@ -1892,6 +2026,11 @@ function cancelGazeConfirm(entity = null) {
   if (gazeProgressTimer) {
     clearInterval(gazeProgressTimer);
     gazeProgressTimer = null;
+  }
+
+  // 新增：移开凝视时，进度环回到 0
+  if (gazeTargetEl) {
+    updateGazeRingVisual(gazeTargetEl, 0);
   }
 
   gazeTargetEl = null;
@@ -2050,7 +2189,7 @@ function toggleSoundObjectConfirm(entity) {
     updateInfo(`${levelDisplayNames[currentLevelName]} | 已取消：${data.label}`);
   } else {
     confirmedSoundIds.add(soundId);
-    playSound(data.audioSrc, soundId, data.soundName);
+    playSound(data.audioSrc, soundId, data.soundName, data.volume);
 
     if (!playedSoundRecords[currentLevelName].includes(soundId)) {
       playedSoundRecords[currentLevelName].push(soundId);
@@ -2087,22 +2226,125 @@ function showFinishHint(finishEntity) {
 // 声音逻辑：文件缺失也不影响视觉
 // ===============================
 
-function playSound(audioSrc, soundId, soundName) {
+function playLevelBackgroundMusic(levelName) {
+  const config = levelBackgroundMusic[levelName];
+
+  // 每次进入新关卡前，先停掉上一关背景音乐
+  stopLevelBackgroundMusic();
+
+  if (!config || !config.src) return;
+
+  const safeVolume = Math.max(0, Math.min(1, Number(config.volume ?? 0.28)));
+
+  const audio = new Audio(config.src);
+  audio.loop = true;
+  audio.preload = "auto";
+  audio.volume = safeVolume;
+
+  backgroundAudio = audio;
+  backgroundAudioId = levelName;
+
+  audio.addEventListener("error", () => {
+    const error = audio.error;
+
+    console.warn(
+      `背景音乐加载错误：${levelName}`,
+      {
+        path: config.src,
+        errorCode: error ? error.code : "unknown",
+        message: getAudioErrorMessage(error)
+      }
+    );
+  });
+
+  audio.play().catch((error) => {
+    console.warn(
+      `背景音乐暂时无法播放：${levelName}`,
+      {
+        path: config.src,
+        volume: safeVolume,
+        errorName: error.name,
+        errorMessage: error.message
+      }
+    );
+  });
+}
+
+function stopLevelBackgroundMusic() {
+  if (!backgroundAudio) return;
+
+  backgroundAudio.pause();
+  backgroundAudio.currentTime = 0;
+
+  // 释放资源，避免上一关背景音乐继续占内存
+  backgroundAudio.removeAttribute("src");
+  backgroundAudio.load();
+
+  backgroundAudio = null;
+  backgroundAudioId = null;
+}
+
+function playSound(audioSrc, soundId, soundName, volume = 0.75) {
   if (!audioSrc) return;
+
+  const safeVolume = Math.max(0, Math.min(1, Number(volume ?? 0.75)));
 
   if (!activeAudios[soundId]) {
     const audio = new Audio(audioSrc);
+
     audio.loop = true;
-    audio.volume = 0.75;
+    audio.preload = "auto";
+    audio.volume = safeVolume;
+
+    audio.addEventListener("error", () => {
+      const error = audio.error;
+
+      console.warn(
+        `音频加载错误：${soundName}`,
+        {
+          path: audioSrc,
+          errorCode: error ? error.code : "unknown",
+          message: getAudioErrorMessage(error)
+        }
+      );
+    });
 
     activeAudios[soundId] = audio;
   }
 
   const audio = activeAudios[soundId];
 
-  audio.play().catch(() => {
-    console.warn(`声音暂时无法播放：${soundName}，请检查音频路径：${audioSrc}`);
+  // 每次播放前都重新应用音量，方便你调试后刷新测试
+  audio.volume = safeVolume;
+
+  audio.play().catch((error) => {
+    console.warn(
+      `声音暂时无法播放：${soundName}`,
+      {
+        path: audioSrc,
+        volume: safeVolume,
+        errorName: error.name,
+        errorMessage: error.message
+      }
+    );
   });
+}
+
+function getAudioErrorMessage(error) {
+  if (!error) return "未知错误";
+
+  switch (error.code) {
+    case 1:
+      return "MEDIA_ERR_ABORTED：加载被中断";
+    case 2:
+      return "MEDIA_ERR_NETWORK：网络或路径问题";
+    case 3:
+      return "MEDIA_ERR_DECODE：音频编码无法解码，建议重新导出 MP3";
+    case 4:
+      return "MEDIA_ERR_SRC_NOT_SUPPORTED：浏览器不支持这个音频源，建议重新转码";
+    default:
+      return "未知音频错误";
+  }
 }
 
 function stopSound(soundId) {
@@ -2119,6 +2361,9 @@ function stopAllSoundsAndClearConfirmState() {
     audio.pause();
     audio.currentTime = 0;
   });
+
+  // 停止并释放背景音乐
+  stopLevelBackgroundMusic();
 
   confirmedSoundIds.clear();
 }
