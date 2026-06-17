@@ -2373,11 +2373,10 @@ async function unlockAllAudioForMobile() {
 
   audioUnlocked = true;
 
-  console.log("正在解锁手机音频：常驻静音播放模式...");
+  console.log("正在解锁手机音频：常驻播放 + muted 静音模式...");
 
   const unlockPromises = [];
 
-  // 1. 解锁所有意象音频
   Object.values(levelData).forEach((level) => {
     level.objects.forEach((item) => {
       if (!item.audioSrc) return;
@@ -2388,17 +2387,18 @@ async function unlockAllAudioForMobile() {
         audio = new Audio(item.audioSrc);
         audio.loop = true;
         audio.preload = "auto";
-        audio.muted = false;
         activeAudios[item.id] = audio;
       }
 
-      // 关键：不要 pause。让它以极低音量启动，然后保持播放。
+      // 关键：先用极小音量启动，让手机承认这是用户点击后的声音
+      audio.muted = false;
       audio.volume = 0.001;
       audio.currentTime = 0;
 
       const p = audio.play()
         .then(() => {
-          audio.volume = 0;
+          // 启动成功后，立刻真正静音
+          muteAudioSafely(audio);
           console.log("手机意象音频已解锁：", item.id);
         })
         .catch((error) => {
@@ -2415,7 +2415,6 @@ async function unlockAllAudioForMobile() {
     });
   });
 
-  // 2. 解锁每层背景音乐
   if (typeof levelBackgroundMusic !== "undefined") {
     Object.entries(levelBackgroundMusic).forEach(([levelName, config]) => {
       if (!config || !config.src) return;
@@ -2426,16 +2425,16 @@ async function unlockAllAudioForMobile() {
         audio = new Audio(config.src);
         audio.loop = true;
         audio.preload = "auto";
-        audio.muted = false;
         backgroundAudios[levelName] = audio;
       }
 
+      audio.muted = false;
       audio.volume = 0.001;
       audio.currentTime = 0;
 
       const p = audio.play()
         .then(() => {
-          audio.volume = 0;
+          muteAudioSafely(audio);
           console.log("手机背景音乐已解锁：", levelName);
         })
         .catch((error) => {
@@ -2454,7 +2453,10 @@ async function unlockAllAudioForMobile() {
 
   await Promise.allSettled(unlockPromises);
 
-  console.log("手机音频解锁流程已执行：常驻静音模式");
+  // 保险：全部解锁完成后，再全体静音一次
+  muteAllActiveAudios();
+
+  console.log("手机音频解锁流程已执行：muted 静音模式");
 }
 
 function createMobileAudioUnlockButton() {
@@ -2563,6 +2565,38 @@ function unlockAllAudioForMobile() {
   console.log("手机音频解锁流程已执行");
 }
 
+function muteAudioSafely(audio) {
+  if (!audio) return;
+
+  audio.muted = true;
+  audio.volume = 0;
+
+  try {
+    audio.currentTime = 0;
+  } catch (error) {}
+}
+
+function unmuteAudioSafely(audio, volume) {
+  if (!audio) return;
+
+  const safeVolume = Math.max(0, Math.min(1, Number(volume ?? 0.75)));
+
+  audio.muted = false;
+  audio.volume = safeVolume;
+}
+
+function muteAllActiveAudios() {
+  Object.values(activeAudios).forEach((audio) => {
+    muteAudioSafely(audio);
+  });
+
+  if (typeof backgroundAudios !== "undefined") {
+    Object.values(backgroundAudios).forEach((audio) => {
+      muteAudioSafely(audio);
+    });
+  }
+}
+
 // ===============================
 // 声音逻辑：文件缺失也不影响视觉
 // ===============================
@@ -2595,7 +2629,7 @@ function playLevelBackgroundMusic(levelName) {
       audio.currentTime = 0;
     } catch (error) {}
 
-    audio.volume = safeVolume;
+    unmuteAudioSafely(audio, safeVolume);
 
     if (audio.paused) {
       audio.play().catch((error) => {
@@ -2606,6 +2640,7 @@ function playLevelBackgroundMusic(levelName) {
     return;
   }
 
+  audio.muted = false;
   audio.volume = safeVolume;
   audio.currentTime = 0;
 
@@ -2626,12 +2661,7 @@ function stopLevelBackgroundMusic() {
   if (!backgroundAudio) return;
 
   if (IS_MOBILE_AUDIO_MODE && audioUnlocked) {
-    backgroundAudio.volume = 0;
-
-    try {
-      backgroundAudio.currentTime = 0;
-    } catch (error) {}
-
+    muteAudioSafely(backgroundAudio);
     backgroundAudio = null;
     backgroundAudioId = null;
     return;
@@ -2675,16 +2705,14 @@ function playSound(audioSrc, soundId, soundName, volume = 0.75) {
 
   const audio = activeAudios[soundId];
 
-  // 手机端：如果已经点击开启声音，就不要重新依赖 autoplay。
-  // 直接把常驻静音音频调大音量即可。
   if (IS_MOBILE_AUDIO_MODE && audioUnlocked) {
     try {
       audio.currentTime = 0;
     } catch (error) {}
 
-    audio.volume = safeVolume;
+    // 手机端：不重新创建声音，只把这个已解锁音频打开
+    unmuteAudioSafely(audio, safeVolume);
 
-    // 保险：如果它意外暂停了，再尝试播放一次
     if (audio.paused) {
       audio.play().catch((error) => {
         console.warn(
@@ -2701,7 +2729,7 @@ function playSound(audioSrc, soundId, soundName, volume = 0.75) {
     return;
   }
 
-  // 电脑端 / 未解锁时：正常播放
+  audio.muted = false;
   audio.volume = safeVolume;
 
   audio.play().catch((error) => {
@@ -2739,15 +2767,8 @@ function stopSound(soundId) {
 
   if (!audio) return;
 
-  // 手机端不要 pause，否则可能破坏已解锁状态。
-  // 只把音量降到 0。
   if (IS_MOBILE_AUDIO_MODE && audioUnlocked) {
-    audio.volume = 0;
-
-    try {
-      audio.currentTime = 0;
-    } catch (error) {}
-
+    muteAudioSafely(audio);
     return;
   }
 
@@ -2758,37 +2779,18 @@ function stopSound(soundId) {
 function stopAllSoundsAndClearConfirmState() {
   stopEndingReplaySounds();
 
+  if (IS_MOBILE_AUDIO_MODE && audioUnlocked) {
+    muteAllActiveAudios();
+    confirmedSoundIds.clear();
+    return;
+  }
+
   Object.values(activeAudios).forEach((audio) => {
-    if (!audio) return;
-
-    if (IS_MOBILE_AUDIO_MODE && audioUnlocked) {
-      audio.volume = 0;
-
-      try {
-        audio.currentTime = 0;
-      } catch (error) {}
-
-      return;
-    }
-
     audio.pause();
     audio.currentTime = 0;
   });
 
-  // 背景音乐也只静音，不 pause
-  if (IS_MOBILE_AUDIO_MODE && audioUnlocked) {
-    Object.values(backgroundAudios).forEach((audio) => {
-      if (!audio) return;
-
-      audio.volume = 0;
-
-      try {
-        audio.currentTime = 0;
-      } catch (error) {}
-    });
-  } else {
-    stopLevelBackgroundMusic();
-  }
+  stopLevelBackgroundMusic();
 
   confirmedSoundIds.clear();
 }
@@ -3505,6 +3507,13 @@ if (endingActiveReplayLevel === levelName) {
 
 function stopEndingReplaySounds() {
   endingReplayAudios.forEach((audio) => {
+    if (!audio) return;
+
+    if (IS_MOBILE_AUDIO_MODE && audioUnlocked) {
+      muteAudioSafely(audio);
+      return;
+    }
+
     audio.pause();
     audio.currentTime = 0;
   });
