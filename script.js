@@ -419,7 +419,7 @@ function bootProject() {
   setupKeyboardInput();
   setupGamepadEvents();
   setupImageFallbacks();
-  setupMobileAudioUnlock();
+  createMobileAudioUnlockButton();
 
   requestAnimationFrame(updateLoop);
 
@@ -2226,15 +2226,268 @@ function showFinishHint(finishEntity) {
     }
   }, 2200);
 }
-function setupMobileAudioUnlock() {
-  const unlock = () => {
-    unlockAllAudioForMobile();
+function createMobileAudioUnlockButton() {
+  if (document.querySelector("#audio-unlock-btn")) return;
+
+  const btn = document.createElement("button");
+  btn.id = "audio-unlock-btn";
+  btn.innerText = "点击开启声音";
+
+  Object.assign(btn.style, {
+    position: "fixed",
+    left: "50%",
+    bottom: "84px",
+    transform: "translateX(-50%)",
+    zIndex: "99999",
+    padding: "12px 24px",
+    borderRadius: "999px",
+    border: "1px solid rgba(255,255,255,0.75)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#000",
+    fontSize: "15px",
+    fontWeight: "bold",
+    letterSpacing: "1px"
+  });
+
+  const unlock = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    btn.innerText = "声音开启中...";
+
+    await unlockAllAudioForMobile();
+
+    btn.innerText = "声音已开启";
+    btn.style.opacity = "0.65";
+
+    setTimeout(() => {
+      btn.remove();
+    }, 700);
   };
 
-  window.addEventListener("pointerdown", unlock, { once: true });
-  window.addEventListener("touchstart", unlock, { once: true });
-  window.addEventListener("click", unlock, { once: true });
-  window.addEventListener("keydown", unlock, { once: true });
+  btn.addEventListener("pointerdown", unlock, { once: true });
+  btn.addEventListener("touchstart", unlock, { once: true });
+  btn.addEventListener("click", unlock, { once: true });
+
+  document.body.appendChild(btn);
+}
+
+async function unlockAllAudioForMobile() {
+  if (audioUnlocked) return;
+
+  audioUnlocked = true;
+
+  console.log("正在解锁手机音频...");
+
+  const unlockPromises = [];
+
+  // 1. 解锁所有意象音频
+  Object.values(levelData).forEach((level) => {
+    level.objects.forEach((item) => {
+      if (!item.audioSrc) return;
+
+      let audio = activeAudios[item.id];
+
+      if (!audio) {
+        audio = new Audio(item.audioSrc);
+        audio.loop = true;
+        audio.preload = "auto";
+        activeAudios[item.id] = audio;
+      }
+
+      // 关键：不要用 0。用极小音量，让手机认为这是“真的有声播放”
+      audio.muted = false;
+      audio.volume = 0.01;
+      audio.currentTime = 0;
+
+      const p = audio.play()
+        .then(() => {
+          setTimeout(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = Math.max(0, Math.min(1, Number(item.volume ?? 0.75)));
+          }, 120);
+        })
+        .catch((error) => {
+          console.warn("手机意象音频解锁失败：", item.id, item.audioSrc, error.name, error.message);
+        });
+
+      unlockPromises.push(p);
+    });
+  });
+
+  // 2. 解锁每层背景音乐
+  if (typeof levelBackgroundMusic !== "undefined") {
+    Object.entries(levelBackgroundMusic).forEach(([levelName, config]) => {
+      if (!config || !config.src) return;
+
+      if (typeof backgroundAudios === "undefined") {
+        window.backgroundAudios = {};
+      }
+
+      let audio = backgroundAudios[levelName];
+
+      if (!audio) {
+        audio = new Audio(config.src);
+        audio.loop = true;
+        audio.preload = "auto";
+        backgroundAudios[levelName] = audio;
+      }
+
+      audio.muted = false;
+      audio.volume = 0.01;
+      audio.currentTime = 0;
+
+      const p = audio.play()
+        .then(() => {
+          setTimeout(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = Math.max(0, Math.min(1, Number(config.volume ?? 0.28)));
+          }, 120);
+        })
+        .catch((error) => {
+          console.warn("手机背景音乐解锁失败：", levelName, config.src, error.name, error.message);
+        });
+
+      unlockPromises.push(p);
+    });
+  }
+
+  await Promise.allSettled(unlockPromises);
+
+  console.log("手机音频解锁流程已执行");
+}function createMobileAudioUnlockButton() {
+  if (document.querySelector("#audio-unlock-btn")) return;
+
+  const btn = document.createElement("button");
+  btn.id = "audio-unlock-btn";
+  btn.innerText = "点击开启声音";
+
+  Object.assign(btn.style, {
+    position: "fixed",
+    left: "50%",
+    bottom: "84px",
+    transform: "translateX(-50%)",
+    zIndex: "99999",
+    padding: "12px 24px",
+    borderRadius: "999px",
+    border: "1px solid rgba(255,255,255,0.75)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#000",
+    fontSize: "15px",
+    fontWeight: "bold",
+    letterSpacing: "1px"
+  });
+
+  const unlock = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    btn.innerText = "声音开启中...";
+
+    await unlockAllAudioForMobile();
+
+    btn.innerText = "声音已开启";
+    btn.style.opacity = "0.65";
+
+    setTimeout(() => {
+      btn.remove();
+    }, 700);
+  };
+
+  btn.addEventListener("pointerdown", unlock, { once: true });
+  btn.addEventListener("touchstart", unlock, { once: true });
+  btn.addEventListener("click", unlock, { once: true });
+
+  document.body.appendChild(btn);
+}
+
+async function unlockAllAudioForMobile() {
+  if (audioUnlocked) return;
+
+  audioUnlocked = true;
+
+  console.log("正在解锁手机音频...");
+
+  const unlockPromises = [];
+
+  // 1. 解锁所有意象音频
+  Object.values(levelData).forEach((level) => {
+    level.objects.forEach((item) => {
+      if (!item.audioSrc) return;
+
+      let audio = activeAudios[item.id];
+
+      if (!audio) {
+        audio = new Audio(item.audioSrc);
+        audio.loop = true;
+        audio.preload = "auto";
+        activeAudios[item.id] = audio;
+      }
+
+      // 关键：不要用 0。用极小音量，让手机认为这是“真的有声播放”
+      audio.muted = false;
+      audio.volume = 0.01;
+      audio.currentTime = 0;
+
+      const p = audio.play()
+        .then(() => {
+          setTimeout(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = Math.max(0, Math.min(1, Number(item.volume ?? 0.75)));
+          }, 120);
+        })
+        .catch((error) => {
+          console.warn("手机意象音频解锁失败：", item.id, item.audioSrc, error.name, error.message);
+        });
+
+      unlockPromises.push(p);
+    });
+  });
+
+  // 2. 解锁每层背景音乐
+  if (typeof levelBackgroundMusic !== "undefined") {
+    Object.entries(levelBackgroundMusic).forEach(([levelName, config]) => {
+      if (!config || !config.src) return;
+
+      if (typeof backgroundAudios === "undefined") {
+        window.backgroundAudios = {};
+      }
+
+      let audio = backgroundAudios[levelName];
+
+      if (!audio) {
+        audio = new Audio(config.src);
+        audio.loop = true;
+        audio.preload = "auto";
+        backgroundAudios[levelName] = audio;
+      }
+
+      audio.muted = false;
+      audio.volume = 0.01;
+      audio.currentTime = 0;
+
+      const p = audio.play()
+        .then(() => {
+          setTimeout(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = Math.max(0, Math.min(1, Number(config.volume ?? 0.28)));
+          }, 120);
+        })
+        .catch((error) => {
+          console.warn("手机背景音乐解锁失败：", levelName, config.src, error.name, error.message);
+        });
+
+      unlockPromises.push(p);
+    });
+  }
+
+  await Promise.allSettled(unlockPromises);
+
+  console.log("手机音频解锁流程已执行");
 }
 
 function unlockAllAudioForMobile() {
