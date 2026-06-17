@@ -113,6 +113,25 @@ const finalSoundRecords = {
 let endingRoot = null;
 let endingReplayAudios = [];
 let endingActiveReplayLevel = null;
+let easterEggRoot = null;
+let hasShownAuthorMatchEasterEgg = false;
+
+const authorFavoriteSoundSets = {
+  floor1: {
+    label: "F1",
+    ids: ["f1-fish", "f1-cricket", "f1-lilac", "f1-tile"]
+  },
+
+  floor2: {
+    label: "F2",
+    ids: ["f2-stone", "f2-leaf", "f2-glass"]
+  },
+
+  floor3: {
+    label: "F3",
+    ids: ["f3-book", "f3-hand", "f3-doll"]
+  }
+};
 
 const levelDisplayNames = {
   guide: "Guide",
@@ -2871,6 +2890,33 @@ function transitionToLevel(levelName) {
   }, 1600);
 }
 
+function areSoundSetsEqual(selectedIds, targetIds) {
+  if (!Array.isArray(selectedIds) || !Array.isArray(targetIds)) return false;
+  if (selectedIds.length !== targetIds.length) return false;
+
+  const selectedSet = new Set(selectedIds);
+  const targetSet = new Set(targetIds);
+
+  return targetIds.every((id) => selectedSet.has(id)) &&
+    selectedIds.every((id) => targetSet.has(id));
+}
+
+function getAuthorMatchLevel() {
+  for (const levelName of Object.keys(authorFavoriteSoundSets)) {
+    const selectedIds = finalSoundRecords[levelName] || [];
+    const target = authorFavoriteSoundSets[levelName];
+
+    if (areSoundSetsEqual(selectedIds, target.ids)) {
+      return {
+        levelName,
+        label: target.label
+      };
+    }
+  }
+
+  return null;
+}
+
 function showEndingState() {
   clearInteractiveObjects();
   cancelGazeConfirm();
@@ -2884,11 +2930,129 @@ function showEndingState() {
 
   // 用一层半透明遮罩模拟“背景被压暗 / 模糊”的感觉
   // 真正的实时背景模糊在 A-Frame 里会比较重，这里先做轻量稳定版
+  const authorMatch = getAuthorMatchLevel();
+
+if (authorMatch && !hasShownAuthorMatchEasterEgg) {
+  hasShownAuthorMatchEasterEgg = true;
+  showAuthorMatchEasterEgg(authorMatch, () => {
+    createEndingScene();
+  });
+} else {
   createEndingScene();
+}
 
   updateInfo("Finale | Select a sound piece to replay");
 
   console.log("Final sound records:", finalSoundRecords);
+}
+function showAuthorMatchEasterEgg(matchInfo, onComplete) {
+  removeAuthorMatchEasterEgg();
+
+  easterEggRoot = document.createElement("a-entity");
+  easterEggRoot.setAttribute("id", "author-match-easter-egg");
+
+  const cameraWorldPosition = new THREE.Vector3();
+  const cameraWorldDirection = new THREE.Vector3();
+
+  cameraObject.getWorldPosition(cameraWorldPosition);
+  cameraObject.getWorldDirection(cameraWorldDirection);
+
+  // 小彩蛋弹窗比最终大窗稍微近一点
+  const distance = 3.6;
+
+  const eggPosition = cameraWorldPosition
+    .clone()
+    .add(cameraWorldDirection.clone().multiplyScalar(-distance));
+
+  easterEggRoot.objectData = {
+    type: "author-match-easter-egg",
+    basePosition: eggPosition.clone(),
+    floatOffset: Math.random() * 10
+  };
+
+  easterEggRoot.object3D.position.copy(eggPosition);
+  easterEggRoot.object3D.lookAt(cameraWorldPosition);
+
+  const card = createAuthorMatchCard(matchInfo);
+  card.setAttribute("position", "0 0 0");
+  easterEggRoot.appendChild(card);
+
+  levelRoot.appendChild(easterEggRoot);
+
+  updateInfo(`Finale | A hidden match was found on ${matchInfo.label}`);
+
+  // 小弹窗停留时间
+  setTimeout(() => {
+    removeAuthorMatchEasterEgg();
+
+    if (typeof onComplete === "function") {
+      onComplete();
+    }
+  }, 2600);
+}
+
+function removeAuthorMatchEasterEgg() {
+  if (easterEggRoot) {
+    easterEggRoot.remove();
+    easterEggRoot = null;
+  }
+}
+
+function createAuthorMatchCard(matchInfo) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  canvas.width = 900;
+  canvas.height = 420;
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 外层柔和阴影
+  context.shadowColor = "rgba(255, 255, 255, 0.35)";
+  context.shadowBlur = 32;
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 0;
+
+  // 简约毛玻璃小卡片
+  context.fillStyle = "rgba(238, 238, 238, 0.78)";
+  roundRect(context, 70, 62, 760, 296, 44);
+  context.fill();
+
+  context.shadowColor = "transparent";
+  context.shadowBlur = 0;
+
+  // 细边框
+  context.strokeStyle = "rgba(255, 255, 255, 0.92)";
+  context.lineWidth = 3;
+  roundRect(context, 70, 62, 760, 296, 44);
+  context.stroke();
+
+  // 内层高光
+  context.strokeStyle = "rgba(255, 255, 255, 0.46)";
+  context.lineWidth = 2;
+  roundRect(context, 88, 80, 724, 260, 36);
+  context.stroke();
+
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+
+  context.font = '66px "AkzidenzCondensed", Arial';
+  context.fillStyle = "rgba(10, 10, 10, 0.94)";
+  context.fillText("A Hidden Match", canvas.width / 2, 150);
+
+  context.font = '34px "AkzidenzCondensed", Arial';
+  context.fillStyle = "rgba(20, 20, 20, 0.78)";
+  context.fillText(
+    `Your ${matchInfo.label} sound piece matches the author's favorite.`,
+    canvas.width / 2,
+    220
+  );
+
+  context.font = '28px "AkzidenzCondensed", Arial';
+  context.fillStyle = "rgba(20, 20, 20, 0.52)";
+  context.fillText("Thank you for listening so closely.", canvas.width / 2, 278);
+
+  return createCanvasPlaneEntity(canvas, 3.7, 1.72, 180, 1);
 }
 
 function createEndingScene() {
@@ -3014,6 +3178,31 @@ function updateEndingRootVisual() {
 
   // 始终面向玩家
   endingRoot.object3D.lookAt(cameraWorldPosition);
+}
+
+function updateAuthorMatchEasterEggVisual() {
+  if (!easterEggRoot || !easterEggRoot.objectData || !cameraObject) return;
+
+  const data = easterEggRoot.objectData;
+  const basePosition = data.basePosition;
+
+  if (!basePosition) return;
+
+  const time = performance.now() * 0.001;
+  const floatOffset = data.floatOffset || 0;
+
+  const floatY = Math.sin(time * 1.1 + floatOffset) * 0.045;
+
+  easterEggRoot.object3D.position.set(
+    basePosition.x,
+    basePosition.y + floatY,
+    basePosition.z
+  );
+
+  const cameraWorldPosition = new THREE.Vector3();
+  cameraObject.getWorldPosition(cameraWorldPosition);
+
+  easterEggRoot.object3D.lookAt(cameraWorldPosition);
 }
 
 function createEndingGlassPanel() {
@@ -3579,8 +3768,9 @@ function updateLoop() {
 
   // 结尾页窗口固定在世界空间里，但始终面向玩家并微微漂浮
   if (currentLevelName === "ending") {
-    updateEndingRootVisual();
-  }
+  updateEndingRootVisual();
+  updateAuthorMatchEasterEggVisual();
+}
 
   if (hasEnteredScene) {
     updateObjectVisualStates();
