@@ -224,6 +224,10 @@ const guideRaycaster = new THREE.Raycaster();
 const guideRayOrigin = new THREE.Vector3();
 const guideRayDirection = new THREE.Vector3();
 
+let lastConfirmActionTime = 0;
+let lastConfirmActionKey = "";
+const CONFIRM_DEBOUNCE_MS = 450;
+
 // ===============================
 // 三关数据
 // ===============================
@@ -2251,11 +2255,25 @@ function handleAButtonClick() {
 
   const data = selectedObject.el.objectData;
 
+  // 防止手机 touchstart + click / group + hitbox 连续触发两次确认
+  const now = performance.now();
+  const actionKey = `${currentLevelName}:${data.type}:${data.id || data.levelName || data.label || ""}`;
+
+  if (
+    now - lastConfirmActionTime < CONFIRM_DEBOUNCE_MS &&
+    actionKey === lastConfirmActionKey
+  ) {
+    return;
+  }
+
+  lastConfirmActionTime = now;
+  lastConfirmActionKey = actionKey;
+
   if (data.type === "ending-replay-button") {
-  playEndingReplay(data.levelName);
-  updateObjectVisualStates();
-  return;
-}
+    playEndingReplay(data.levelName);
+    updateObjectVisualStates();
+    return;
+  }
 
   if (data.type === "guide-enter-button") {
     enterFirstLevelFromGuide();
@@ -2459,51 +2477,7 @@ async function unlockAllAudioForMobile() {
   console.log("手机音频解锁流程已执行：muted 静音模式");
 }
 
-function createMobileAudioUnlockButton() {
-  if (document.querySelector("#audio-unlock-btn")) return;
 
-  const btn = document.createElement("button");
-  btn.id = "audio-unlock-btn";
-  btn.innerText = "点击开启声音";
-
-  Object.assign(btn.style, {
-    position: "fixed",
-    left: "50%",
-    bottom: "84px",
-    transform: "translateX(-50%)",
-    zIndex: "99999",
-    padding: "12px 24px",
-    borderRadius: "999px",
-    border: "1px solid rgba(255,255,255,0.75)",
-    background: "rgba(255,255,255,0.92)",
-    color: "#000",
-    fontSize: "15px",
-    fontWeight: "bold",
-    letterSpacing: "1px"
-  });
-
-  const unlock = async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    btn.innerText = "声音开启中...";
-
-    await unlockAllAudioForMobile();
-
-    btn.innerText = "声音已开启";
-    btn.style.opacity = "0.65";
-
-    setTimeout(() => {
-      btn.remove();
-    }, 700);
-  };
-
-  btn.addEventListener("pointerdown", unlock, { once: true });
-  btn.addEventListener("touchstart", unlock, { once: true });
-  btn.addEventListener("click", unlock, { once: true });
-
-  document.body.appendChild(btn);
-}
 
 
 
@@ -3490,16 +3464,31 @@ if (endingActiveReplayLevel === levelName) {
 
     if (!item || !item.audioSrc) return;
 
-    const audio = new Audio(item.audioSrc);
-    audio.loop = true;
-    audio.volume = Math.max(0, Math.min(1, Number(item.volume ?? 0.75)));
+    let audio = activeAudios[soundId];
 
-    endingReplayAudios.push(audio);
+if (!audio) {
+  audio = new Audio(item.audioSrc);
+  audio.loop = true;
+  audio.preload = "auto";
+  activeAudios[soundId] = audio;
+}
 
-    audio.play().catch((error) => {
-      console.warn("Ending sound replay failed:", soundId, error);
-    });
+try {
+  audio.currentTime = 0;
+} catch (error) {}
+
+audio.loop = true;
+unmuteAudioSafely(audio, item.volume ?? 0.75);
+
+endingReplayAudios.push(audio);
+
+if (audio.paused) {
+  audio.play().catch((error) => {
+    console.warn("Ending sound replay failed:", soundId, error);
   });
+}
+  });
+
 
   updateInfo(`Finale | Replaying ${levelDisplayNames[levelName]}`);
   updateEndingButtonStates();
