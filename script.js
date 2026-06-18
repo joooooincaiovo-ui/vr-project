@@ -2967,7 +2967,7 @@ function showAuthorMatchEasterEgg(matchInfo, onComplete) {
     if (typeof onComplete === "function") {
       onComplete();
     }
-  }, 2600);
+  }, 4000);
 }
 
 function removeAuthorMatchEasterEgg() {
