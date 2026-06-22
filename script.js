@@ -977,13 +977,6 @@ function setupGuideButtons() {
   setupGuideButtonsAndFullScreen();
 }
 
-function showControllerGuide() {
-  showVRGuideScene();
-}
-
-function showGazeGuide() {
-  showVRGuideScene();
-}
 
 // ===============================
 // VR 黑色教学空间：左右并列显示手柄 / 眼神教学图
@@ -1094,6 +1087,7 @@ function createGuideImagePlane({ id, src, position, rotation }) {
 }
 
 
+
 function createGuideOkButton({ parentPanel, mode, position }) {
   const okGroup = document.createElement("a-entity");
   okGroup.classList.add("interactive-hitbox");
@@ -1116,11 +1110,6 @@ function createGuideOkButton({ parentPanel, mode, position }) {
   );
   hitbox.object3D.renderOrder = 200;
 
-  // 注册给自定义视线检测使用：
-  // 这样即使 A-Frame 的 mouseenter 在某些浏览器里不稳定，
-  // updateGuideGazeRaycast() 也能稳定检测到右侧 OK 按钮。
-  hitbox.object3D.userData.guideOkButton = okGroup;
-  guideOkRaycastObjects.push(hitbox.object3D);
 
   hitbox.addEventListener("loaded", () => {
     const mesh = hitbox.getObject3D("mesh");
@@ -1162,6 +1151,7 @@ progressRing.setAttribute(
 progressRing.object3D.renderOrder = 302;
 
 okGroup.appendChild(progressRing);
+okGroup.guideProgressRing = progressRing;
 
   const onEnter = () => {
     if (!isGuideVisible || isGuideEnteringGame) return;
@@ -1204,6 +1194,7 @@ okGroup.appendChild(progressRing);
   return okGroup;
 }
 
+
 function removeVRGuideScene() {
   cancelGuideGazeEnter();
 
@@ -1217,7 +1208,7 @@ function removeVRGuideScene() {
   guideEnterButton = null;
   guideOkRaycastObjects.length = 0;
 guideGazeTarget = null;
-  guideProgressCircle = null;
+
   isGuideVisible = false;
 }
 
@@ -1307,42 +1298,7 @@ function updateGuideOkVisual(target, progress) {
   ring.setAttribute("theta-length", angle);
 }
 
-function updateGuideGazeRaycast() {
-  if (!isGuideVisible || hasEnteredScene || isGuideEnteringGame) return;
-  if (controlMode !== "gaze") return;
-  if (!cameraObject || guideOkRaycastObjects.length === 0) return;
 
-  cameraObject.getWorldPosition(guideRayOrigin);
-  cameraObject.getWorldDirection(guideRayDirection);
-
-  guideRaycaster.set(guideRayOrigin, guideRayDirection);
-
-  const intersections = guideRaycaster.intersectObjects(guideOkRaycastObjects, true);
-
-  if (intersections.length > 0) {
-    const hit = intersections[0].object;
-    const target = hit.userData.guideOkButton;
-
-    if (target && target.objectData && target.objectData.mode === "gaze") {
-      startGuideGazeEnter(target);
-      return;
-    }
-  }
-
-  cancelGuideGazeEnter();
-}
-
-function updateGuideInfo(text) {
-  // 教学空间的说明已经写在图片里，不再显示左上角信息，避免干扰画面。
-  // Enter正式关卡后，updateInfo() 会继续正常显示关卡提示。
-  if (isGuideVisible) return;
-
-  const infoPanel = document.querySelector("#info");
-  const infoText = document.querySelector("#info p");
-
-  if (infoPanel) infoPanel.classList.remove("hidden");
-  if (infoText) infoText.textContent = text;
-}
 
 function enterSceneFromGuide() {
   if (hasEnteredScene || isGuideEnteringGame) return;
@@ -1436,28 +1392,6 @@ function loadPanoramas() {
   };
 }
 
-function createStableCubeTexture(loader, files) {
-  const texture = loader.load(files);
-
-  // 手机端 VR 模式下，CubeTexture 的边缘采样容易出现白色锯齿/接缝
-  // 这里关闭 mipmap，并强制使用边缘夹取，减少六面图边缘被错误采样
-  texture.generateMipmaps = false;
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.wrapS = THREE.ClampToEdgeWrapping;
-  texture.wrapT = THREE.ClampToEdgeWrapping;
-
-  // A-Frame 1.5 / Three r158 使用 colorSpace
-  if ("colorSpace" in texture) {
-    texture.colorSpace = THREE.SRGBColorSpace;
-  } else {
-    texture.encoding = THREE.sRGBEncoding;
-  }
-
-  texture.needsUpdate = true;
-
-  return texture;
-}
 
 function setPanorama(levelName) {
   if (!sceneEl || !panoramas[levelName]) return;
@@ -2479,66 +2413,6 @@ async function unlockAllAudioForMobile() {
 
 
 
-
-
-function unlockAllAudioForMobile() {
-  if (audioUnlocked) return;
-
-  audioUnlocked = true;
-
-  console.log("正在解锁手机音频...");
-
-  // 1. 解锁所有意象音频
-  Object.values(levelData).forEach((level) => {
-    level.objects.forEach((item) => {
-      if (!item.audioSrc || activeAudios[item.id]) return;
-
-      const audio = new Audio(item.audioSrc);
-      audio.loop = true;
-      audio.preload = "auto";
-      audio.volume = 0;
-
-      activeAudios[item.id] = audio;
-
-      audio.play()
-        .then(() => {
-          audio.pause();
-          audio.currentTime = 0;
-          audio.volume = Math.max(0, Math.min(1, Number(item.volume ?? 0.75)));
-        })
-        .catch((error) => {
-          console.warn("手机音频预解锁失败：", item.id, item.audioSrc, error);
-        });
-    });
-  });
-
-  // 2. 如果你加了每层背景音乐，也一起解锁
-  if (typeof levelBackgroundMusic !== "undefined") {
-    Object.entries(levelBackgroundMusic).forEach(([levelName, config]) => {
-      if (!config || !config.src || backgroundAudios[levelName]) return;
-
-      const audio = new Audio(config.src);
-      audio.loop = true;
-      audio.preload = "auto";
-      audio.volume = 0;
-
-      backgroundAudios[levelName] = audio;
-
-      audio.play()
-        .then(() => {
-          audio.pause();
-          audio.currentTime = 0;
-          audio.volume = Math.max(0, Math.min(1, Number(config.volume ?? 0.28)));
-        })
-        .catch((error) => {
-          console.warn("手机背景音乐预解锁失败：", levelName, config.src, error);
-        });
-    });
-  }
-
-  console.log("手机音频解锁流程已执行");
-}
-
 function muteAudioSafely(audio) {
   if (!audio) return;
 
@@ -2845,6 +2719,53 @@ function transitionToLevel(levelName) {
     setPanorama(levelName);
     loadLevel(levelName);
     isLevelTransitioning = false;
+    return;
+  }
+
+  // 只在教学页进入 F1 时播放较长的双语引导过场。
+  if (currentLevelName === "guide" && levelName === "floor1") {
+    const guideMessage = document.querySelector("#guide-transition-message");
+
+    fogOverlay.style.display = "block";
+    fogOverlay.style.transition = "opacity 1.2s ease-in-out";
+    fogOverlay.style.opacity = "1";
+
+    if (guideMessage) {
+      guideMessage.style.transition = "none";
+      guideMessage.style.opacity = "0";
+    }
+
+    // 白幕完全覆盖后，先在幕后加载 F1，再显示引导文字。
+    setTimeout(() => {
+      setPanorama(levelName);
+      loadLevel(levelName);
+
+      if (guideMessage) {
+        guideMessage.style.transition = "opacity 1s ease-in-out";
+        guideMessage.style.opacity = "1";
+      }
+
+      // 文字渐显后完整停留 5 秒，再渐隐。
+      setTimeout(() => {
+        if (guideMessage) {
+          guideMessage.style.transition = "opacity 1s ease-in-out";
+          guideMessage.style.opacity = "0";
+        }
+
+        // 文字完全消失后，白幕才渐隐，露出 F1。
+        setTimeout(() => {
+          fogOverlay.style.transition = "opacity 1.4s ease-in-out";
+          fogOverlay.style.opacity = "0";
+
+          setTimeout(() => {
+            isLevelTransitioning = false;
+            fogOverlay.style.transition = "";
+            fogOverlay.style.display = "";
+          }, 1400);
+        }, 1000);
+      }, 6000);
+    }, 1200);
+
     return;
   }
 
@@ -3276,27 +3197,7 @@ function createCanvasPlaneEntity(canvas, width, height, renderOrder = 100, opaci
   return entity;
 }
 
-function createInvisibleHitboxEntity(width, height, renderOrder = 130) {
-  const geometry = new THREE.PlaneGeometry(width, height);
 
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x000000,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: false,
-    side: THREE.DoubleSide
-  });
-
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.renderOrder = renderOrder;
-
-  const entity = document.createElement("a-entity");
-  entity.classList.add("interactive-hitbox");
-  entity.setObject3D("mesh", mesh);
-
-  return entity;
-}
 
 function createEndingReplayButton({ levelName, title, subtitle, x }) {
   const group = document.createElement("a-entity");
