@@ -3112,8 +3112,8 @@ function createEndingGlassPanel() {
   context.shadowOffsetX = 0;
   context.shadowOffsetY = 0;
 
-  // 主卡片底色：比原来更实，不再灰蒙蒙
-  context.fillStyle = "rgba(238, 238, 238, 0.82)";
+  // 只降低主卡片底色的透明度；文字和三个回放按钮保持原来的颜色。
+  context.fillStyle = "rgba(238, 238, 238, 0.62)";
   roundRect(context, 56, 48, 912, 544, 54);
   context.fill();
 
@@ -3169,6 +3169,9 @@ function createEndingGlassPanel() {
 
 function createCanvasPlaneEntity(canvas, width, height, renderOrder = 100, opacity = 1) {
   const texture = new THREE.CanvasTexture(canvas);
+  // 手机端 WebGL 对透明 Canvas 的混合偶尔会显示黑色底框。
+  // 使用预乘 Alpha，并在材质层裁掉完全透明的像素。
+  texture.premultiplyAlpha = true;
   texture.needsUpdate = true;
 
   if ("colorSpace" in texture) {
@@ -3181,6 +3184,8 @@ function createCanvasPlaneEntity(canvas, width, height, renderOrder = 100, opaci
     map: texture,
     transparent: true,
     opacity,
+    alphaTest: 0.01,
+    premultipliedAlpha: true,
     depthWrite: false,
     depthTest: false,
     toneMapped: false,
